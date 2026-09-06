@@ -169,6 +169,22 @@ flowchart TD
 | `fund_utilization` | Financial utilization snapshot | mp_id, expenditure, remaining_amount | Derived/ingested | Snapshot per period |
 | `work_completion` / `completion_rates` | Portfolio summary | mp_id, totals | Derived | Snapshot per period |
 | `projects` | Central historical project memory | project_id, mp_id, district, category, status, lifecycle stage | System (created on recommendation) | Never deleted; status transitions only |
+
+**Canonical project lifecycle (`projects.status`)** — this is the authoritative enumeration; `design.md` and `phases.doc.md` reference it rather than defining their own:
+
+```text
+MP_RECOMMENDED → DISTRICT_REVIEW → CLARIFICATION_REQUIRED / HELD → SANCTIONED
+   → IN_PROGRESS → COMPLETED
+```
+Cross-cutting states, applicable alongside the above: `INSPECTION_REQUIRED`, `ESCALATED`. All transitions are authorized by Express only (§9).
+
+**Canonical inspection lifecycle (`inspections.status`)**:
+
+```text
+RECOMMENDED → PENDING_DECISION → ASSIGNED → SCHEDULED
+   → IN_PROGRESS → COMPLETED → RESULT_RECORDED
+```
+This is distinct from the inspection **result** (`NO_ISSUE` / `REVIEW_REQUIRED` / `ESCALATE`), which is recorded once an inspection reaches `RESULT_RECORDED`.
 | `project_recommendations` | Original MP recommendation, immutable | project_id, description, specs, estimated_cost | MP | Write-once |
 | `engineering_reports` | Engineer-submitted technical detail, versioned | project_id, specs, cost, submitted_by, version | Engineer/Agency | Append-only (new version, not overwrite) |
 | `project_progress` | Every progress update, versioned | project_id, date, % progress, notes | Engineer/Agency | Append-only |
