@@ -1,0 +1,54 @@
+{
+  "$jsonSchema": {
+    "bsonType": "object",
+    "required": [
+      "audit_id",
+      "user_id",
+      "role",
+      "action",
+      "entity_type",
+      "entity_id",
+      "timestamp"
+    ],
+    "properties": {
+      "audit_id": {
+        "bsonType": "string"
+      },
+      "user_id": {
+        "bsonType": "string"
+      },
+      "role": {
+        "bsonType": "string"
+      },
+      "action": {
+        "bsonType": "string"
+      },
+      "entity_type": {
+        "enum": [
+          "PROJECT",
+          "RECOMMENDATION",
+          "ENGINEERING_REPORT",
+          "PAYMENT",
+          "UTILIZATION_CERTIFICATE",
+          "INSPECTION",
+          "DECISION",
+          "USER",
+          "SYSTEM_CONFIG"
+        ]
+      },
+      "entity_id": {
+        "bsonType": "string"
+      },
+      "project_id": {
+        "bsonType": ["string", "null"]
+      },
+      "reason": {
+        "bsonType": ["string", "null"]
+      },
+      "timestamp": {
+        "bsonType": "date"
+      }
+    }
+  }
+}
+

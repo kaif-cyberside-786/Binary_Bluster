@@ -1,0 +1,49 @@
+{
+  "$jsonSchema": {
+    "bsonType": "object",
+    "required": [
+      "mp_id",
+      "mp_name",
+      "state",
+      "constituency",
+      "year",
+      "allocated_amount"
+    ],
+    "properties": {
+      "mp_id": {
+        "bsonType": "string",
+        "description": "Unique identifier for the Member of Parliament"
+      },
+      "mp_name": {
+        "bsonType": "string",
+        "description": "Full official name of the MP"
+      },
+      "state": {
+        "bsonType": "string",
+        "description": "State or Union Territory name"
+      },
+      "constituency": {
+        "bsonType": "string",
+        "description": "Parliamentary Constituency name"
+      },
+      "year": {
+        "bsonType": "string",
+        "description": "Financial year string, e.g. 2024-2025"
+      },
+      "allocated_amount": {
+        "bsonType": ["double", "int", "long"],
+        "minimum": 0,
+        "description": "Total statutory funds allocated for the financial year"
+      },
+      "is_real_government_data": {
+        "bsonType": "bool",
+        "description": "Flag indicating real government-ingested data"
+      },
+      "is_synthetic": {
+        "bsonType": "bool",
+        "description": "Flag indicating synthetic demo data"
+      }
+    }
+  }
+}
+

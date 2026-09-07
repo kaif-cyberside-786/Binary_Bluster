@@ -1,0 +1,24 @@
+{
+  "name": "mplads-platform",
+  "version": "1.0.0",
+  "description": "MPLADS AI Risk Monitoring & Decision Support Platform (SIH Problem Statement 26102)",
+  "private": true,
+  "scripts": {
+    "dev:backend": "npm --prefix backend-node run dev",
+    "dev:frontend": "npm --prefix frontend run dev",
+    "build:frontend": "npm --prefix frontend run build",
+    "test": "node tests/runAll.js",
+    "test:backend": "node --test tests/backend/health.test.js tests/backend/auth.test.js tests/backend/adminUsers.test.js tests/backend/domainModels.test.js tests/backend/allocationLoader.test.js",
+    "test:frontend": "node --test tests/frontend/designTokens.test.js tests/frontend/authAndRouting.test.js",
+    "load:allocations": "node backend-node/scripts/loadAllocations.js"
+  },
+  "keywords": [
+    "mplads",
+    "sih2026",
+    "decision-support",
+    "risk-monitoring"
+  ],
+  "author": "Binary Bluster Team",
+  "license": "UNLICENSED"
+}
+

@@ -1,0 +1,55 @@
+{
+  "$jsonSchema": {
+    "bsonType": "object",
+    "required": [
+      "inspection_id",
+      "project_id",
+      "inspection_type",
+      "status",
+      "priority"
+    ],
+    "properties": {
+      "inspection_id": {
+        "bsonType": "string",
+        "description": "Unique inspection identifier"
+      },
+      "project_id": {
+        "bsonType": "string",
+        "description": "Inspected project identifier"
+      },
+      "inspection_type": {
+        "enum": [
+          "STATUTORY_10_PERCENT_DA",
+          "STATUTORY_1_PERCENT_STATE",
+          "SPECIAL_RISK_TRIGGER"
+        ]
+      },
+      "status": {
+        "enum": [
+          "RECOMMENDED",
+          "PENDING_DECISION",
+          "ASSIGNED",
+          "SCHEDULED",
+          "IN_PROGRESS",
+          "COMPLETED",
+          "RESULT_RECORDED"
+        ],
+        "description": "Canonical inspection lifecycle status"
+      },
+      "result": {
+        "enum": ["NO_ISSUE", "REVIEW_REQUIRED", "ESCALATE", null]
+      },
+      "priority": {
+        "enum": ["ROUTINE", "MEDIUM", "HIGH", "URGENT"]
+      },
+      "assigned_officer_id": {
+        "bsonType": ["string", "null"]
+      },
+      "adverse_flags_count": {
+        "bsonType": ["int", "long"],
+        "minimum": 0
+      }
+    }
+  }
+}
+

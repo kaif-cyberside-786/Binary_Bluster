@@ -1,0 +1,102 @@
+{
+  "$jsonSchema": {
+    "bsonType": "object",
+    "required": [
+      "user_id",
+      "official_email",
+      "password_hash",
+      "full_name",
+      "role",
+      "jurisdiction"
+    ],
+    "properties": {
+      "user_id": {
+        "bsonType": "string",
+        "pattern": "^[A-Z0-9_-]{3,50}$",
+        "description": "Unique user ID, uppercase alphanumeric with underscores/hyphens"
+      },
+      "official_email": {
+        "bsonType": "string",
+        "pattern": "^\\S+@\\S+\\.\\S+$",
+        "description": "Official email address must be a valid format"
+      },
+      "password_hash": {
+        "bsonType": "string",
+        "minLength": 60,
+        "description": "Bcrypt hashed password"
+      },
+      "full_name": {
+        "bsonType": "string",
+        "minLength": 2,
+        "maxLength": 100,
+        "description": "User's full name"
+      },
+      "role": {
+        "enum": [
+          "MP",
+          "DISTRICT_AUTHORITY",
+          "IMPLEMENTING_AGENCY",
+          "STATE_NODAL_AUTHORITY",
+          "MINISTRY",
+          "AUDITOR",
+          "ADMIN"
+        ],
+        "description": "Must be one of the 7 canonical platform roles"
+      },
+      "designation": {
+        "bsonType": "string",
+        "maxLength": 100
+      },
+      "phone": {
+        "bsonType": "string",
+        "pattern": "^[6-9]\\d{9}$",
+        "description": "10-digit Indian mobile number"
+      },
+      "jurisdiction": {
+        "bsonType": "object",
+        "required": ["level"],
+        "properties": {
+          "level": {
+            "enum": ["NATIONAL", "STATE", "DISTRICT", "CONSTITUENCY", "AGENCY"]
+          },
+          "state": {
+            "bsonType": "string"
+          },
+          "district": {
+            "bsonType": "string"
+          },
+          "constituency": {
+            "bsonType": "string"
+          },
+          "agency_id": {
+            "bsonType": "string"
+          }
+        }
+      },
+      "is_active": {
+        "bsonType": "bool",
+        "description": "Account status flag"
+      },
+      "failed_login_attempts": {
+        "bsonType": "int",
+        "minimum": 0
+      },
+      "lockout_until": {
+        "bsonType": ["date", "null"]
+      },
+      "password_reset_token": {
+        "bsonType": ["string", "null"]
+      },
+      "password_reset_expires": {
+        "bsonType": ["date", "null"]
+      },
+      "created_at": {
+        "bsonType": "date"
+      },
+      "updated_at": {
+        "bsonType": "date"
+      }
+    }
+  }
+}
+
