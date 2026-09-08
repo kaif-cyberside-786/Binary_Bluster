@@ -7,6 +7,8 @@ const mongoose = require('mongoose');
 
 const NOTIFICATION_TYPES = [
   'RISK_ALERT',
+  'COMPLIANCE_ALERT',
+  'ESCALATION',
   'CLARIFICATION_REQUEST',
   'SANCTION_APPROVED',
   'INSPECTION_ASSIGNED',

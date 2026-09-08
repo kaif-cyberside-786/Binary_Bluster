@@ -1,0 +1,94 @@
+{
+  "name": "MPLADS — Notifications Router",
+  "nodes": [
+    {
+      "parameters": {
+        "httpMethod": "POST",
+        "path": "route-notifications",
+        "options": {}
+      },
+      "id": "9c570a80-d374-6c2c-d540-1008e9f46c01",
+      "name": "Webhook: Route Notifications",
+      "type": "n8n-nodes-base.webhook",
+      "typeVersion": 2,
+      "position": [240, 220]
+    },
+    {
+      "parameters": {
+        "jsCode": "// Prepare structured notifications according to role and rule severity per rules.md §6\nconst payload = $input.first().json.body || $input.first().json;\nconst notifications = [];\n\nif (Array.isArray(payload.violations)) {\n  for (const v of payload.violations) {\n    notifications.push({\n      recipient_user_id: v.recipient_user_id || 'USR-DIST-01',\n      type: v.type || 'COMPLIANCE_ALERT',\n      title: v.title || `[COMPLIANCE] Action Required: ${v.project_id}`,\n      message: v.message || `Compliance issue flagged: ${v.rule_id} with status ${v.status}`,\n      project_id: v.project_id,\n    });\n  }\n} else if (payload.recipient_user_id) {\n  notifications.push({\n    recipient_user_id: payload.recipient_user_id,\n    type: payload.type || 'COMPLIANCE_ALERT',\n    title: payload.title,\n    message: payload.message,\n    project_id: payload.project_id,\n  });\n}\n\nreturn [{\n  json: {\n    notifications,\n  }\n}];"
+      },
+      "id": "9c570a80-d374-6c2c-d540-1008e9f46c02",
+      "name": "Format Notifications Payload",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [480, 220]
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "={{ ($env.INTERNAL_API_BASE_URL || 'http://localhost:5000') + '/api/internal/notifications' }}",
+        "sendHeaders": true,
+        "headerParameters": {
+          "parameters": [
+            {
+              "name": "X-Service-Token",
+              "value": "={{ $env.N8N_SERVICE_TOKEN || 'mplads_dev_n8n_service_secret_token_123' }}"
+            },
+            {
+              "name": "Content-Type",
+              "value": "application/json"
+            }
+          ]
+        },
+        "sendBody": true,
+        "specifyBody": "json",
+        "jsonBody": "={\n  \"notifications\": {{ JSON.stringify($json.notifications) }}\n}",
+        "options": {
+          "timeout": 15000
+        }
+      },
+      "id": "9c570a80-d374-6c2c-d540-1008e9f46c03",
+      "name": "Dispatch Notifications to Express",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [720, 220]
+    }
+  ],
+  "connections": {
+    "Webhook: Route Notifications": {
+      "main": [
+        [
+          {
+            "node": "Format Notifications Payload",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Format Notifications Payload": {
+      "main": [
+        [
+          {
+            "node": "Dispatch Notifications to Express",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    }
+  },
+  "active": false,
+  "settings": {
+    "executionOrder": "v1"
+  },
+  "tags": [
+    {
+      "name": "MPLADS"
+    },
+    {
+      "name": "Notifications"
+    }
+  ]
+}
+

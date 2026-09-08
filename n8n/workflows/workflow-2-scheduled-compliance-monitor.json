@@ -1,0 +1,152 @@
+{
+  "name": "MPLADS — Scheduled Compliance Monitor",
+  "nodes": [
+    {
+      "parameters": {
+        "rule": {
+          "interval": [
+            {
+              "field": "cronExpression",
+              "expression": "0 2 * * *"
+            }
+          ]
+        }
+      },
+      "id": "8b46f97f-c263-5b1b-c439-09f7d8e35b01",
+      "name": "Daily Schedule Trigger (02:00 UTC)",
+      "type": "n8n-nodes-base.scheduleTrigger",
+      "typeVersion": 1.2,
+      "position": [240, 220]
+    },
+    {
+      "parameters": {},
+      "id": "8b46f97f-c263-5b1b-c439-09f7d8e35b02",
+      "name": "Manual Monitor Trigger",
+      "type": "n8n-nodes-base.manualTrigger",
+      "typeVersion": 1,
+      "position": [240, 60]
+    },
+    {
+      "parameters": {
+        "method": "GET",
+        "url": "={{ ($env.INTERNAL_API_BASE_URL || 'http://localhost:5000') + '/api/internal/projects/active?limit=50' }}",
+        "sendHeaders": true,
+        "headerParameters": {
+          "parameters": [
+            {
+              "name": "X-Service-Token",
+              "value": "={{ $env.N8N_SERVICE_TOKEN || 'mplads_dev_n8n_service_secret_token_123' }}"
+            }
+          ]
+        },
+        "options": {
+          "timeout": 15000
+        }
+      },
+      "id": "8b46f97f-c263-5b1b-c439-09f7d8e35b03",
+      "name": "Fetch Active Works",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [480, 160]
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "={{ ($env.INTERNAL_API_BASE_URL || 'http://localhost:5000') + '/api/internal/compliance/evaluate-batch' }}",
+        "sendHeaders": true,
+        "headerParameters": {
+          "parameters": [
+            {
+              "name": "X-Service-Token",
+              "value": "={{ $env.N8N_SERVICE_TOKEN || 'mplads_dev_n8n_service_secret_token_123' }}"
+            },
+            {
+              "name": "Content-Type",
+              "value": "application/json"
+            }
+          ]
+        },
+        "sendBody": true,
+        "specifyBody": "json",
+        "jsonBody": "={\n  \"projectIds\": {{ JSON.stringify($json.data.projects.map(p => p.project_id)) }}\n}",
+        "options": {
+          "timeout": 60000
+        }
+      },
+      "id": "8b46f97f-c263-5b1b-c439-09f7d8e35b04",
+      "name": "Run Batch Compliance Evaluation",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [720, 160]
+    },
+    {
+      "parameters": {
+        "jsCode": "// Evaluates Phase 6 deterministic rule findings.\n// NOTE: AI Risk Engine integration hook reserved for Phase 9.\nconst batch = $input.first().json.data;\nconst nonCompliant = batch.results.filter(r => r.overall_status === 'NON_COMPLIANT');\nconst reviewRequired = batch.results.filter(r => r.overall_status === 'REVIEW_REQUIRED');\n\nreturn [{\n  json: {\n    total_evaluated: batch.total_evaluated,\n    compliant_count: batch.compliant_count,\n    review_required_count: batch.review_required_count,\n    non_compliant_count: batch.non_compliant_count,\n    has_violations: nonCompliant.length > 0 || reviewRequired.length > 0,\n    flagged_projects: [...nonCompliant, ...reviewRequired],\n    timestamp: batch.timestamp,\n  }\n}];"
+      },
+      "id": "8b46f97f-c263-5b1b-c439-09f7d8e35b05",
+      "name": "Analyze Violations",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [960, 160]
+    }
+  ],
+  "connections": {
+    "Daily Schedule Trigger (02:00 UTC)": {
+      "main": [
+        [
+          {
+            "node": "Fetch Active Works",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Manual Monitor Trigger": {
+      "main": [
+        [
+          {
+            "node": "Fetch Active Works",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Fetch Active Works": {
+      "main": [
+        [
+          {
+            "node": "Run Batch Compliance Evaluation",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Run Batch Compliance Evaluation": {
+      "main": [
+        [
+          {
+            "node": "Analyze Violations",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    }
+  },
+  "active": false,
+  "settings": {
+    "executionOrder": "v1"
+  },
+  "tags": [
+    {
+      "name": "MPLADS"
+    },
+    {
+      "name": "Monitoring"
+    }
+  ]
+}
+

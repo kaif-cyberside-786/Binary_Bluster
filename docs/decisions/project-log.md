@@ -338,9 +338,51 @@ AI compares, detects anomalies, calculates/receives risk signals, explains findi
     - `tests/backend/complianceRules.test.js` added to `tests/runAll.js`
     - Full test suite verified via `npm test`: **111/111 tests passing across 13 suites** (100% green, 0 failures)
 - **Not done / remaining**:
-  - None (Phase 6 complete and verified). Phase 7 (n8n workflows) on hold until requested.
+  - None (Phase 6 complete and verified).
 - **Notes**:
   - Deterministic findings are strictly separated from AI risk scoring. All compliance states use `ComplianceBadge` (`COMPLIANT`, `REVIEW_REQUIRED`, `NON_COMPLIANT`) with square/dot visual markers, never `RiskBadge` pill badges. No ML or LLM models used.
+
+### Phase 7: n8n Automation & Background Workflows
+- **Status**: Complete
+- **Exit Checklist**:
+  - [x] Requirements completed
+  - [x] Code reviewed
+  - [x] Feature tested
+  - [x] Security/permissions verified where applicable
+  - [x] Documentation/memory updated where applicable
+  - [x] No known blocking issues
+- **Done**:
+  - Internal service authentication middleware (`authenticateService` in `backend-node/src/middleware/serviceAuth.js`):
+    - Validates `X-Service-Token` or `Authorization: Bearer <token>` against `config.n8nServiceToken` (timing-safe comparison) or valid JWT with `role: 'SERVICE'`.
+    - Strict boundary enforcement: Service identity cannot access officer transactional endpoints (`PATCH /api/projects/:id/decision`) and cannot create MP recommendations.
+    - Admin Isolation maintained: Regular admin tokens cannot access `/api/internal/*` without service credentials.
+    - Production env constraint: `N8N_SERVICE_TOKEN` and `N8N_WEBHOOK_SECRET` require real env in production, weak defaults for development/test only; `.env.example` contains placeholders only.
+  - Internal service endpoints (`backend-node/src/routes/internal.js` mounted at `/api/internal`):
+    - `GET /api/internal/status`: System and automation health telemetry (uptime, database connection, internal API status).
+    - `POST /api/internal/ingestion/allocations`: Triggers idempotent CSV allocation data loader (`loadMpAllocation`), tags `is_real_government_data: true`, returns counts.
+    - `GET /api/internal/projects/active`: Retrieves active works (`DISTRICT_REVIEW`, `SANCTIONED`, `IN_PROGRESS`) with pagination and jurisdiction filtering.
+    - `POST /api/internal/compliance/evaluate-batch`: Evaluates compliance in batch using Phase 6 deterministic engine and returns categorized results summary (`COMPLIANT`, `REVIEW_REQUIRED`, `NON_COMPLIANT`).
+    - `POST /api/internal/notifications`: Creates server-validated notifications in `notifications` collection with role/jurisdiction routing. Added `COMPLIANCE_ALERT` and `ESCALATION` to `NOTIFICATION_TYPES`.
+    - `POST /api/internal/escalations`: Multi-level governance alert dispatching notifications to District Authority, State Nodal Authority, and Ministry.
+    - `POST /api/internal/inspections/recommend`: Advisory recommendation shell creating `RECOMMENDED` inspection records in `inspections` collection (does not auto-assign or auto-close).
+  - n8n Workflow definitions & documentation in `n8n/`:
+    - `README.md`: Architecture boundaries, local CLI/Docker setup, credential configuration (`Header Auth: X-Service-Token`), workflow import steps, and stop n8n verification guide.
+    - `workflows/workflow-1-data-ingestion.json`: `MPLADS — Data Ingestion` (Webhook/manual trigger -> Express API -> result logging).
+    - `workflows/workflow-2-scheduled-compliance-monitor.json`: `MPLADS — Scheduled Compliance Monitor` (Cron trigger -> active works -> evaluate batch -> violation analysis). AI risk engine integration clearly stubbed for Phase 9.
+    - `workflows/workflow-3-notifications-router.json`: `MPLADS — Notifications Router` (Webhook trigger -> payload formatting -> Express API).
+    - `workflows/workflow-4-escalation-handler.json`: `MPLADS — Escalation Handler` (Webhook trigger -> multi-tier threshold evaluation -> Express API).
+    - `workflows/workflow-5-inspection-recommendation-shell.json`: `MPLADS — Inspection Recommendation Shell` (Webhook trigger -> advisory inspection recommendation shell).
+  - Test suites & verification:
+    - Added `tests/backend/internalServiceAndAutomation.test.js` (15 comprehensive tests covering token validation, 401 on missing/invalid credentials, role isolation, ingestion idempotency, batch compliance, notification validation, escalation multi-tier routing, inspection shell, and core path independence).
+    - Added to `tests/runAll.js`.
+    - `npm test` runs **126/126 passing tests across 14 suites** (100% green, 0 failures).
+    - Core path independence verified: MP recommend -> District sanction -> compliance evaluate -> Project 360 all execute synchronously without n8n running.
+- **Not done / remaining**:
+  - None (Phase 7 complete and verified). Phase 8 (AI Cost Anomaly & Duplicate Detection) on hold until requested.
+- **Notes**:
+  - n8n is strictly background automation; never authentication, RBAC, primary DB, or final decision authority.
+  - Zero direct MongoDB connections from n8n nodes; all mutations occur via Express service endpoints.
+  - AI risk engine integration hooks stubbed with comments for Phase 9.
 
 
 

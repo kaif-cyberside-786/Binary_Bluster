@@ -12,6 +12,7 @@ const dashboardRoutes = require('./dashboard');
 const userPreferenceRoutes = require('./userPreferences');
 const documentRoutes = require('./documents');
 const complianceRoutes = require('./compliance');
+const internalRoutes = require('./internal');
 
 const router = express.Router();
 
@@ -35,6 +36,9 @@ router.use('/documents', documentRoutes);
 
 // Mount compliance monitoring routes (/api/compliance/...)
 router.use('/compliance', complianceRoutes);
+
+// Mount internal service automation routes (/api/internal/...)
+router.use('/internal', internalRoutes);
 
 // Mount dashboard routes (/api/dashboard/...)
 router.use('/dashboard', dashboardRoutes);

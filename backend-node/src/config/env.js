@@ -39,6 +39,24 @@ const config = {
     ? path.resolve(process.env.UPLOAD_DIR)
     : path.resolve(__dirname, '../../uploads'),
   maxFileSizeMb: parseInt(process.env.MAX_FILE_SIZE_MB, 10) || 10,
+
+  // n8n Automation & Background Services (Phase 7)
+  n8nServiceToken:
+    process.env.N8N_SERVICE_TOKEN ||
+    (process.env.NODE_ENV === 'production'
+      ? (() => {
+          throw new Error('N8N_SERVICE_TOKEN must be set in production');
+        })()
+      : 'mplads_dev_n8n_service_secret_token_123'),
+  n8nWebhookSecret:
+    process.env.N8N_WEBHOOK_SECRET ||
+    (process.env.NODE_ENV === 'production'
+      ? (() => {
+          throw new Error('N8N_WEBHOOK_SECRET must be set in production');
+        })()
+      : 'mplads_dev_n8n_webhook_secret_key_456'),
+  internalApiBaseUrl: process.env.INTERNAL_API_BASE_URL || 'http://localhost:5000',
+  n8nBaseUrl: process.env.N8N_BASE_URL || 'http://localhost:5678',
 };
 
 module.exports = config;

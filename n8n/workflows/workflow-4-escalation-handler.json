@@ -1,0 +1,94 @@
+{
+  "name": "MPLADS — Escalation Handler",
+  "nodes": [
+    {
+      "parameters": {
+        "httpMethod": "POST",
+        "path": "escalate",
+        "options": {}
+      },
+      "id": "ad681b91-e485-7d3d-e651-2119f0a57d01",
+      "name": "Webhook: Escalation Trigger",
+      "type": "n8n-nodes-base.webhook",
+      "typeVersion": 2,
+      "position": [240, 220]
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "={{ ($env.INTERNAL_API_BASE_URL || 'http://localhost:5000') + '/api/internal/escalations' }}",
+        "sendHeaders": true,
+        "headerParameters": {
+          "parameters": [
+            {
+              "name": "X-Service-Token",
+              "value": "={{ $env.N8N_SERVICE_TOKEN || 'mplads_dev_n8n_service_secret_token_123' }}"
+            },
+            {
+              "name": "Content-Type",
+              "value": "application/json"
+            }
+          ]
+        },
+        "sendBody": true,
+        "specifyBody": "json",
+        "jsonBody": "={\n  \"district\": \"{{ $json.body?.district || 'Indore' }}\",\n  \"state\": \"{{ $json.body?.state || 'Madhya Pradesh' }}\",\n  \"trigger_reason\": \"{{ $json.body?.trigger_reason || 'Persistent non-compliant threshold breach' }}\",\n  \"non_compliant_count\": {{ $json.body?.non_compliant_count || 1 }},\n  \"project_ids\": {{ JSON.stringify($json.body?.project_ids || []) }},\n  \"notes\": \"{{ $json.body?.notes || 'Automated multi-tier governance escalation dispatched by n8n' }}\"\n}",
+        "options": {
+          "timeout": 15000
+        }
+      },
+      "id": "ad681b91-e485-7d3d-e651-2119f0a57d02",
+      "name": "Call Express Escalations API",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [480, 220]
+    },
+    {
+      "parameters": {
+        "jsCode": "// Logs and verifies escalation delivery across authority tiers\nconst response = $input.first().json;\n\nreturn [{\n  json: {\n    status: 'ESCALATION_RECORDED',\n    escalation_id: response.data?.escalation_id,\n    district: response.data?.district,\n    state: response.data?.state,\n    notified_users_count: response.data?.notified_users_count,\n    notified_roles: response.data?.notified_roles,\n    dispatched_at: response.data?.timestamp,\n  }\n}];"
+      },
+      "id": "ad681b91-e485-7d3d-e651-2119f0a57d03",
+      "name": "Log Escalation Summary",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [720, 220]
+    }
+  ],
+  "connections": {
+    "Webhook: Escalation Trigger": {
+      "main": [
+        [
+          {
+            "node": "Call Express Escalations API",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Call Express Escalations API": {
+      "main": [
+        [
+          {
+            "node": "Log Escalation Summary",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    }
+  },
+  "active": false,
+  "settings": {
+    "executionOrder": "v1"
+  },
+  "tags": [
+    {
+      "name": "MPLADS"
+    },
+    {
+      "name": "Escalation"
+    }
+  ]
+}
+

@@ -1,0 +1,113 @@
+{
+  "name": "MPLADS — Data Ingestion",
+  "nodes": [
+    {
+      "parameters": {
+        "httpMethod": "POST",
+        "path": "ingest-allocations",
+        "options": {}
+      },
+      "id": "7a35e86e-b152-4a0a-b328-98e6c7d24a01",
+      "name": "Webhook Trigger",
+      "type": "n8n-nodes-base.webhook",
+      "typeVersion": 2,
+      "position": [240, 300]
+    },
+    {
+      "parameters": {},
+      "id": "7a35e86e-b152-4a0a-b328-98e6c7d24a02",
+      "name": "Manual Ingestion Trigger",
+      "type": "n8n-nodes-base.manualTrigger",
+      "typeVersion": 1,
+      "position": [240, 140]
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "={{ ($env.INTERNAL_API_BASE_URL || 'http://localhost:5000') + '/api/internal/ingestion/allocations' }}",
+        "sendHeaders": true,
+        "headerParameters": {
+          "parameters": [
+            {
+              "name": "X-Service-Token",
+              "value": "={{ $env.N8N_SERVICE_TOKEN || 'mplads_dev_n8n_service_secret_token_123' }}"
+            },
+            {
+              "name": "Content-Type",
+              "value": "application/json"
+            }
+          ]
+        },
+        "sendBody": true,
+        "specifyBody": "json",
+        "jsonBody": "={\n  \"year\": \"{{ $json.body?.year || '2024-2025' }}\"\n}",
+        "options": {
+          "timeout": 30000
+        }
+      },
+      "id": "7a35e86e-b152-4a0a-b328-98e6c7d24a03",
+      "name": "Call Express Ingestion API",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [480, 220]
+    },
+    {
+      "parameters": {
+        "jsCode": "// Format and log ingestion response per rules.md §9 & §13\nconst response = $input.first().json;\n\nif (!response.success) {\n  throw new Error(`Ingestion failed: ${JSON.stringify(response.error)}`);\n}\n\nreturn [{\n  json: {\n    status: 'INGESTION_COMPLETED',\n    loaded_records: response.data.loaded,\n    skipped_records: response.data.skipped,\n    total_rows: response.data.total_rows,\n    financial_year: response.data.financial_year,\n    is_real_government_data: response.data.is_real_government_data,\n    executed_at: response.data.timestamp,\n  }\n}];"
+      },
+      "id": "7a35e86e-b152-4a0a-b328-98e6c7d24a04",
+      "name": "Format Ingestion Summary",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [720, 220]
+    }
+  ],
+  "connections": {
+    "Webhook Trigger": {
+      "main": [
+        [
+          {
+            "node": "Call Express Ingestion API",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Manual Ingestion Trigger": {
+      "main": [
+        [
+          {
+            "node": "Call Express Ingestion API",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Call Express Ingestion API": {
+      "main": [
+        [
+          {
+            "node": "Format Ingestion Summary",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    }
+  },
+  "active": false,
+  "settings": {
+    "executionOrder": "v1"
+  },
+  "tags": [
+    {
+      "name": "MPLADS"
+    },
+    {
+      "name": "Ingestion"
+    }
+  ]
+}
+

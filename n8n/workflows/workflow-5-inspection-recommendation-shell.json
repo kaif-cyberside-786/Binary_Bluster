@@ -1,0 +1,94 @@
+{
+  "name": "MPLADS — Inspection Recommendation Shell",
+  "nodes": [
+    {
+      "parameters": {
+        "httpMethod": "POST",
+        "path": "recommend-inspection",
+        "options": {}
+      },
+      "id": "be792ca2-f596-8e4e-f762-322001b68e01",
+      "name": "Webhook: Inspection Trigger",
+      "type": "n8n-nodes-base.webhook",
+      "typeVersion": 2,
+      "position": [240, 220]
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "={{ ($env.INTERNAL_API_BASE_URL || 'http://localhost:5000') + '/api/internal/inspections/recommend' }}",
+        "sendHeaders": true,
+        "headerParameters": {
+          "parameters": [
+            {
+              "name": "X-Service-Token",
+              "value": "={{ $env.N8N_SERVICE_TOKEN || 'mplads_dev_n8n_service_secret_token_123' }}"
+            },
+            {
+              "name": "Content-Type",
+              "value": "application/json"
+            }
+          ]
+        },
+        "sendBody": true,
+        "specifyBody": "json",
+        "jsonBody": "={\n  \"project_id\": \"{{ $json.body?.project_id }}\",\n  \"reason\": \"{{ $json.body?.reason || 'Compliance threshold breach: physical inspection recommended' }}\",\n  \"priority\": \"{{ $json.body?.priority || 'HIGH' }}\"\n}",
+        "options": {
+          "timeout": 15000
+        }
+      },
+      "id": "be792ca2-f596-8e4e-f762-322001b68e02",
+      "name": "Call Express Recommend Inspection API",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [480, 220]
+    },
+    {
+      "parameters": {
+        "jsCode": "// Logs advisory inspection recommendation.\n// CRITICAL: Does NOT automatically assign an officer, schedule, or close decisions.\nconst response = $input.first().json;\n\nreturn [{\n  json: {\n    status: 'INSPECTION_RECOMMENDED',\n    inspection_id: response.data?.inspection_id,\n    project_id: response.data?.project_id,\n    inspection_status: response.data?.status,\n    priority: response.data?.priority,\n    advisory_note: response.data?.advisory_note,\n  }\n}];"
+      },
+      "id": "be792ca2-f596-8e4e-f762-322001b68e03",
+      "name": "Log Advisory Shell Result",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [720, 220]
+    }
+  ],
+  "connections": {
+    "Webhook: Inspection Trigger": {
+      "main": [
+        [
+          {
+            "node": "Call Express Recommend Inspection API",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Call Express Recommend Inspection API": {
+      "main": [
+        [
+          {
+            "node": "Log Advisory Shell Result",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    }
+  },
+  "active": false,
+  "settings": {
+    "executionOrder": "v1"
+  },
+  "tags": [
+    {
+      "name": "MPLADS"
+    },
+    {
+      "name": "Inspections"
+    }
+  ]
+}
+
