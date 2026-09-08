@@ -3,6 +3,7 @@
  * Tests all 7 pure-function deterministic rules, evaluator orchestrator,
  * compliance API routes, jurisdiction boundaries, and strict Admin Isolation (403).
  */
+process.env.NODE_ENV = 'test';
 const path = require('path');
 module.paths.push(path.resolve(__dirname, '../../backend-node/node_modules'));
 
@@ -10,6 +11,7 @@ const { test, describe, before, after } = require('node:test');
 const assert = require('node:assert/strict');
 const http = require('http');
 const mongoose = require('mongoose');
+const bcrypt = require('bcryptjs');
 const jwt = require('jsonwebtoken');
 
 const app = require('../../backend-node/src/app');
@@ -33,132 +35,112 @@ const {
   evaluateMpScStStatus,
 } = require('../../backend-node/src/services/compliance');
 
-let server;
-let baseUrl;
-
-function makeRequest(method, pathName, body = null, token = null) {
-  return new Promise((resolve, reject) => {
-    const url = new URL(pathName, baseUrl);
-    const headers = { 'Content-Type': 'application/json' };
-    if (token) headers['Authorization'] = `Bearer ${token}`;
-
-    const req = http.request(
-      url,
-      { method, headers },
-      (res) => {
-        let raw = '';
-        res.on('data', (chunk) => (raw += chunk));
-        res.on('end', () => {
-          let data = null;
-          try {
-            data = JSON.parse(raw);
-          } catch {
-            data = raw;
-          }
-          resolve({ status: res.statusCode, headers: res.headers, data });
-        });
-      }
-    );
-    req.on('error', reject);
-    if (body) req.write(JSON.stringify(body));
-    req.end();
-  });
-}
-
-function generateToken(user) {
-  return jwt.sign(
-    {
-      user_id: user.user_id,
-      official_email: user.official_email,
-      role: user.role,
-      jurisdiction: user.jurisdiction,
-    },
-    config.jwtSecret,
-    { expiresIn: '1h' }
-  );
-}
-
-const TEST_MP_USER = {
-  user_id: 'MP-IND-01',
-  official_email: 'mp.indore@sansad.nic.in',
-  role: 'MP',
-  jurisdiction: { level: 'CONSTITUENCY', state: 'Madhya Pradesh', constituency: 'Indore' },
-};
-
-const TEST_DA_USER = {
-  user_id: 'DA-IND-01',
-  official_email: 'collector.indore@mp.gov.in',
-  role: 'DISTRICT_AUTHORITY',
-  jurisdiction: { level: 'DISTRICT', state: 'Madhya Pradesh', district: 'Indore' },
-};
-
-const TEST_DA_OTHER_USER = {
-  user_id: 'DA-CMP-DHAR-01',
-  official_email: 'da.dhar@mp.gov.in',
-  role: 'DISTRICT_AUTHORITY',
-  jurisdiction: { level: 'DISTRICT', state: 'Madhya Pradesh', district: 'Dhar' },
-};
-
-const TEST_ADMIN_USER = {
-  user_id: 'ADMIN001',
-  official_email: 'admin@mplads.gov.in',
-  role: 'ADMIN',
-  jurisdiction: { level: 'NATIONAL' },
-};
-
-let mpToken;
-let daToken;
-let daOtherToken;
-let adminToken;
-
-const TEST_PROJECT_ID = 'PRJ-MAD-IND-CMPTEST01';
-
 describe('Phase 6: Deterministic Compliance & Monitoring Tests', () => {
+  let server;
+  let baseUrl;
+
+  const mpId = 'MP-CMP-TEST-01';
+  const daId = 'DA-CMP-IND-01';
+  const otherDaId = 'DA-CMP-DHAR-01';
+  const adminId = 'ADMIN-CMP-01';
+
+  let mpToken;
+  let daToken;
+  let otherDaToken;
+  let adminToken;
+
+  const testProjectId = 'PRJ-MAD-IND-CMPTEST01';
+
   before(async () => {
     if (mongoose.connection.readyState === 0) {
       await mongoose.connect(config.mongoUri);
     }
 
-    server = http.createServer(app);
-    await new Promise((resolve) => server.listen(0, resolve));
-    const port = server.address().port;
-    baseUrl = `http://127.0.0.1:${port}`;
-
     // Clean up test data using native collection to bypass append-only hooks in tests
-    await mongoose.connection.collection('projects').deleteMany({ project_id: TEST_PROJECT_ID });
-    await mongoose.connection.collection('project_recommendations').deleteMany({ project_id: TEST_PROJECT_ID });
-    await mongoose.connection.collection('engineering_reports').deleteMany({ project_id: TEST_PROJECT_ID });
-    await mongoose.connection.collection('project_progress').deleteMany({ project_id: TEST_PROJECT_ID });
-    await mongoose.connection.collection('project_payments').deleteMany({ project_id: TEST_PROJECT_ID });
-    await mongoose.connection.collection('utilization_certificates').deleteMany({ project_id: TEST_PROJECT_ID });
-    await mongoose.connection.collection('documents').deleteMany({ project_id: TEST_PROJECT_ID });
-    await mongoose.connection.collection('compliance_findings').deleteMany({ project_id: TEST_PROJECT_ID });
-    await mongoose.connection.collection('audit_logs').deleteMany({ project_id: TEST_PROJECT_ID });
-    await mongoose.connection.collection('users').deleteMany({ user_id: TEST_DA_OTHER_USER.user_id });
-
-    // Seed test Dhar DA user for cross-jurisdiction check
-    await mongoose.connection.collection('users').insertOne({
-      user_id: TEST_DA_OTHER_USER.user_id,
-      official_email: TEST_DA_OTHER_USER.official_email,
-      password_hash: 'dummyhash',
-      full_name: 'Collector Dhar Test',
-      role: TEST_DA_OTHER_USER.role,
-      designation: 'District Collector',
-      jurisdiction: TEST_DA_OTHER_USER.jurisdiction,
-      is_active: true,
-      created_at: new Date(),
-      updated_at: new Date(),
+    await mongoose.connection.collection('users').deleteMany({
+      user_id: { $in: [mpId, daId, otherDaId, adminId] },
     });
+    await mongoose.connection.collection('projects').deleteMany({ project_id: testProjectId });
+    await mongoose.connection.collection('project_recommendations').deleteMany({ project_id: testProjectId });
+    await mongoose.connection.collection('engineering_reports').deleteMany({ project_id: testProjectId });
+    await mongoose.connection.collection('project_progress').deleteMany({ project_id: testProjectId });
+    await mongoose.connection.collection('project_payments').deleteMany({ project_id: testProjectId });
+    await mongoose.connection.collection('utilization_certificates').deleteMany({ project_id: testProjectId });
+    await mongoose.connection.collection('documents').deleteMany({ project_id: testProjectId });
+    await mongoose.connection.collection('compliance_findings').deleteMany({ project_id: testProjectId });
+    await mongoose.connection.collection('audit_logs').deleteMany({ project_id: testProjectId });
 
-    mpToken = generateToken(TEST_MP_USER);
-    daToken = generateToken(TEST_DA_USER);
-    daOtherToken = generateToken(TEST_DA_OTHER_USER);
-    adminToken = generateToken(TEST_ADMIN_USER);
+    const hash = await bcrypt.hash('TestPass@123', 12);
+
+    // Create test users
+    await User.create([
+      {
+        user_id: mpId,
+        official_email: 'mp.cmptest@test.gov.in',
+        password_hash: hash,
+        full_name: 'Hon MP Indore CMP Test',
+        role: 'MP',
+        designation: 'Member of Parliament',
+        jurisdiction: { level: 'CONSTITUENCY', state: 'Madhya Pradesh', constituency: 'Indore' },
+        is_active: true,
+      },
+      {
+        user_id: daId,
+        official_email: 'da.cmptest@test.gov.in',
+        password_hash: hash,
+        full_name: 'District Collector Indore CMP Test',
+        role: 'DISTRICT_AUTHORITY',
+        designation: 'Collector',
+        jurisdiction: { level: 'DISTRICT', state: 'Madhya Pradesh', district: 'Indore' },
+        is_active: true,
+      },
+      {
+        user_id: otherDaId,
+        official_email: 'da.dhar.cmptest@test.gov.in',
+        password_hash: hash,
+        full_name: 'District Collector Dhar CMP Test',
+        role: 'DISTRICT_AUTHORITY',
+        designation: 'Collector',
+        jurisdiction: { level: 'DISTRICT', state: 'Madhya Pradesh', district: 'Dhar' },
+        is_active: true,
+      },
+      {
+        user_id: adminId,
+        official_email: 'admin.cmptest@test.gov.in',
+        password_hash: hash,
+        full_name: 'Admin CMP Test',
+        role: 'ADMIN',
+        designation: 'System Administrator',
+        jurisdiction: { level: 'NATIONAL' },
+        is_active: true,
+      },
+    ]);
+
+    mpToken = jwt.sign(
+      { user_id: mpId, role: 'MP', jurisdiction: { level: 'CONSTITUENCY', state: 'Madhya Pradesh', constituency: 'Indore' } },
+      config.jwtSecret,
+      { expiresIn: '1h' }
+    );
+    daToken = jwt.sign(
+      { user_id: daId, role: 'DISTRICT_AUTHORITY', jurisdiction: { level: 'DISTRICT', state: 'Madhya Pradesh', district: 'Indore' } },
+      config.jwtSecret,
+      { expiresIn: '1h' }
+    );
+    otherDaToken = jwt.sign(
+      { user_id: otherDaId, role: 'DISTRICT_AUTHORITY', jurisdiction: { level: 'DISTRICT', state: 'Madhya Pradesh', district: 'Dhar' } },
+      config.jwtSecret,
+      { expiresIn: '1h' }
+    );
+    adminToken = jwt.sign(
+      { user_id: adminId, role: 'ADMIN', jurisdiction: { level: 'NATIONAL' } },
+      config.jwtSecret,
+      { expiresIn: '1h' }
+    );
 
     // Seed test project in SANCTIONED status
     await Project.create({
-      project_id: TEST_PROJECT_ID,
-      mp_id: TEST_MP_USER.user_id,
+      project_id: testProjectId,
+      mp_id: mpId,
       state: 'Madhya Pradesh',
       district: 'Indore',
       category: 'Roads & Bridges',
@@ -170,35 +152,60 @@ describe('Phase 6: Deterministic Compliance & Monitoring Tests', () => {
     });
 
     await ProjectRecommendation.create({
-      project_id: TEST_PROJECT_ID,
-      mp_id: TEST_MP_USER.user_id,
+      project_id: testProjectId,
+      mp_id: mpId,
       description: 'Construction of durable CC road connecting main market to hospital ward 12',
       estimated_cost: 2500000,
       work_category: 'Roads & Bridges',
       location: { block: 'Indore Urban', village_ward: 'Ward 12' },
-      recommended_by: TEST_MP_USER.user_id,
+      recommended_by: mpId,
+    });
+
+    // Start server
+    await new Promise((resolve) => {
+      server = http.createServer(app);
+      server.listen(0, '127.0.0.1', () => {
+        baseUrl = `http://127.0.0.1:${server.address().port}`;
+        resolve();
+      });
     });
   });
 
   after(async () => {
     // Native cleanup to bypass Mongoose append-only hooks
     if (mongoose.connection.readyState !== 0) {
-      await mongoose.connection.collection('projects').deleteMany({ project_id: TEST_PROJECT_ID });
-      await mongoose.connection.collection('project_recommendations').deleteMany({ project_id: TEST_PROJECT_ID });
-      await mongoose.connection.collection('engineering_reports').deleteMany({ project_id: TEST_PROJECT_ID });
-      await mongoose.connection.collection('project_progress').deleteMany({ project_id: TEST_PROJECT_ID });
-      await mongoose.connection.collection('project_payments').deleteMany({ project_id: TEST_PROJECT_ID });
-      await mongoose.connection.collection('utilization_certificates').deleteMany({ project_id: TEST_PROJECT_ID });
-      await mongoose.connection.collection('documents').deleteMany({ project_id: TEST_PROJECT_ID });
-      await mongoose.connection.collection('compliance_findings').deleteMany({ project_id: TEST_PROJECT_ID });
-      await mongoose.connection.collection('audit_logs').deleteMany({ project_id: TEST_PROJECT_ID });
-      await mongoose.connection.collection('users').deleteMany({ user_id: TEST_DA_OTHER_USER.user_id });
+      await mongoose.connection.collection('users').deleteMany({
+        user_id: { $in: [mpId, daId, otherDaId, adminId] },
+      });
+      await mongoose.connection.collection('projects').deleteMany({ project_id: testProjectId });
+      await mongoose.connection.collection('project_recommendations').deleteMany({ project_id: testProjectId });
+      await mongoose.connection.collection('engineering_reports').deleteMany({ project_id: testProjectId });
+      await mongoose.connection.collection('project_progress').deleteMany({ project_id: testProjectId });
+      await mongoose.connection.collection('project_payments').deleteMany({ project_id: testProjectId });
+      await mongoose.connection.collection('utilization_certificates').deleteMany({ project_id: testProjectId });
+      await mongoose.connection.collection('documents').deleteMany({ project_id: testProjectId });
+      await mongoose.connection.collection('compliance_findings').deleteMany({ project_id: testProjectId });
+      await mongoose.connection.collection('audit_logs').deleteMany({ project_id: testProjectId });
     }
 
-    if (server) {
-      await new Promise((resolve) => server.close(resolve));
-    }
+    if (server?.closeAllConnections) server.closeAllConnections();
+    if (server) await new Promise((resolve) => server.close(resolve));
+    await mongoose.disconnect();
   });
+
+  async function request(endpoint, options = {}) {
+    const url = `${baseUrl}${endpoint}`;
+    const headers = { 'Content-Type': 'application/json', ...(options.headers || {}) };
+    const res = await fetch(url, { ...options, headers });
+    const text = await res.text();
+    let body = null;
+    try {
+      body = JSON.parse(text);
+    } catch {
+      body = text;
+    }
+    return { status: res.status, headers: res.headers, body };
+  }
 
   // 1. Pure unit tests for individual rules
   test('Rule 1 (REQUIRED_FIELDS): passes on valid project, flags missing fields', () => {
@@ -327,90 +334,149 @@ describe('Phase 6: Deterministic Compliance & Monitoring Tests', () => {
 
   // 2. Integration & API Route Tests
   test('POST /api/compliance/evaluate/:projectId triggers evaluation and persists findings', async () => {
-    const res = await makeRequest('POST', `/api/compliance/evaluate/${TEST_PROJECT_ID}`, {}, daToken);
+    const res = await request(`/api/compliance/evaluate/${testProjectId}`, {
+      method: 'POST',
+      headers: { Authorization: `Bearer ${daToken}` },
+    });
     assert.equal(res.status, 200);
-    assert.equal(res.data.success, true);
-    assert.equal(res.data.data.project_id, TEST_PROJECT_ID);
-    assert.ok(['COMPLIANT', 'REVIEW_REQUIRED', 'NON_COMPLIANT'].includes(res.data.data.overall_status));
-    assert.equal(res.data.data.summary.total_rules, 6);
+    assert.equal(res.body.success, true);
+    assert.equal(res.body.data.project_id, testProjectId);
+    assert.ok(['COMPLIANT', 'REVIEW_REQUIRED', 'NON_COMPLIANT'].includes(res.body.data.overall_status));
+    assert.equal(res.body.data.summary.total_rules, 6);
 
     // Verify persisted findings in MongoDB
-    const persisted = await ComplianceFinding.find({ project_id: TEST_PROJECT_ID }).lean();
+    const persisted = await ComplianceFinding.find({ project_id: testProjectId }).lean();
     assert.equal(persisted.length, 6);
 
     // Verify AuditLog
     const audit = await AuditLog.findOne({
-      project_id: TEST_PROJECT_ID,
+      project_id: testProjectId,
       action: 'EVALUATE_COMPLIANCE',
     }).lean();
     assert.ok(audit);
-    assert.equal(audit.user_id, TEST_DA_USER.user_id);
+    assert.equal(audit.user_id, daId);
   });
 
   test('GET /api/compliance/project/:projectId returns project compliance details', async () => {
-    const res = await makeRequest('GET', `/api/compliance/project/${TEST_PROJECT_ID}`, null, daToken);
+    const res = await request(`/api/compliance/project/${testProjectId}`, {
+      headers: { Authorization: `Bearer ${daToken}` },
+    });
     assert.equal(res.status, 200);
-    assert.equal(res.data.success, true);
-    assert.equal(res.data.data.project_id, TEST_PROJECT_ID);
-    assert.ok(Array.isArray(res.data.data.findings));
-    assert.equal(res.data.data.findings.length, 6);
+    assert.equal(res.body.success, true);
+    assert.equal(res.body.data.project_id, testProjectId);
+    assert.ok(Array.isArray(res.body.data.findings));
+    assert.equal(res.body.data.findings.length, 6);
+  });
+
+  test('GET /api/compliance/projects/:projectId plural alias returns project compliance details', async () => {
+    const res = await request(`/api/compliance/projects/${testProjectId}`, {
+      headers: { Authorization: `Bearer ${daToken}` },
+    });
+    assert.equal(res.status, 200);
+    assert.equal(res.body.success, true);
+    assert.equal(res.body.data.project_id, testProjectId);
   });
 
   test('GET /api/projects/:projectId includes compliance summary in Project 360', async () => {
-    const res = await makeRequest('GET', `/api/projects/${TEST_PROJECT_ID}`, null, daToken);
+    const res = await request(`/api/projects/${testProjectId}`, {
+      headers: { Authorization: `Bearer ${daToken}` },
+    });
     assert.equal(res.status, 200);
-    assert.equal(res.data.success, true);
-    assert.ok(res.data.data.compliance);
-    assert.ok(res.data.data.compliance.overall_status);
-    assert.ok(Array.isArray(res.data.data.compliance.findings));
+    assert.equal(res.body.success, true);
+    assert.ok(res.body.data.compliance);
+    assert.ok(res.body.data.compliance.overall_status);
+    assert.ok(Array.isArray(res.body.data.compliance.findings));
   });
 
   test('GET /api/compliance/sc-st-status/:mpId returns continuous quota evaluation', async () => {
-    const res = await makeRequest('GET', `/api/compliance/sc-st-status/${TEST_MP_USER.user_id}`, null, mpToken);
+    const res = await request(`/api/compliance/sc-st-status/${mpId}`, {
+      headers: { Authorization: `Bearer ${mpToken}` },
+    });
     assert.equal(res.status, 200);
-    assert.equal(res.data.success, true);
-    assert.equal(res.data.data.mp_id, TEST_MP_USER.user_id);
-    assert.ok(res.data.data.evidence.sc_target_percent === 15);
-    assert.ok(res.data.data.evidence.st_target_percent === 7.5);
+    assert.equal(res.body.success, true);
+    assert.equal(res.body.data.mp_id, mpId);
+    assert.ok(res.body.data.evidence.sc_target_percent === 15);
+    assert.ok(res.body.data.evidence.st_target_percent === 7.5);
+  });
+
+  test('GET /api/compliance/mp returns MP quota without explicit ID in URL', async () => {
+    const res = await request('/api/compliance/mp', {
+      headers: { Authorization: `Bearer ${mpToken}` },
+    });
+    assert.equal(res.status, 200);
+    assert.equal(res.body.success, true);
+    assert.equal(res.body.data.mp_id, mpId);
+  });
+
+  test('GET /api/compliance/district returns in-jurisdiction compliance queue', async () => {
+    const res = await request('/api/compliance/district', {
+      headers: { Authorization: `Bearer ${daToken}` },
+    });
+    assert.equal(res.status, 200);
+    assert.equal(res.body.success, true);
+    assert.ok(Array.isArray(res.body.data.items));
   });
 
   test('GET /api/compliance/dashboard returns scoped compliance statistics', async () => {
-    const res = await makeRequest('GET', '/api/compliance/dashboard', null, daToken);
+    const res = await request('/api/compliance/dashboard', {
+      headers: { Authorization: `Bearer ${daToken}` },
+    });
     assert.equal(res.status, 200);
-    assert.equal(res.data.success, true);
-    assert.ok(res.data.data.total_projects >= 1);
-    assert.ok(res.data.data.findings_by_rule);
+    assert.equal(res.body.success, true);
+    assert.ok(res.body.data.total_projects >= 1);
+    assert.ok(res.body.data.findings_by_rule);
   });
 
   test('Strict Admin Isolation: Admin receives 403 on all compliance routes per rules.md §10', async () => {
     // 1. Evaluate
-    const resEval = await makeRequest('POST', `/api/compliance/evaluate/${TEST_PROJECT_ID}`, {}, adminToken);
+    const resEval = await request(`/api/compliance/evaluate/${testProjectId}`, {
+      method: 'POST',
+      headers: { Authorization: `Bearer ${adminToken}` },
+    });
     assert.equal(resEval.status, 403);
-    assert.equal(resEval.data.error.code, 'ADMIN_ISOLATION');
+    assert.equal(resEval.body.error.code, 'ADMIN_ISOLATION');
 
     // 2. Project compliance
-    const resPrj = await makeRequest('GET', `/api/compliance/project/${TEST_PROJECT_ID}`, null, adminToken);
+    const resPrj = await request(`/api/compliance/project/${testProjectId}`, {
+      headers: { Authorization: `Bearer ${adminToken}` },
+    });
     assert.equal(resPrj.status, 403);
-    assert.equal(resPrj.data.error.code, 'ADMIN_ISOLATION');
+    assert.equal(resPrj.body.error.code, 'ADMIN_ISOLATION');
 
     // 3. SC/ST Status
-    const resQuota = await makeRequest('GET', `/api/compliance/sc-st-status/${TEST_MP_USER.user_id}`, null, adminToken);
+    const resQuota = await request(`/api/compliance/sc-st-status/${mpId}`, {
+      headers: { Authorization: `Bearer ${adminToken}` },
+    });
     assert.equal(resQuota.status, 403);
-    assert.equal(resQuota.data.error.code, 'ADMIN_ISOLATION');
+    assert.equal(resQuota.body.error.code, 'ADMIN_ISOLATION');
 
     // 4. Compliance dashboard
-    const resDash = await makeRequest('GET', '/api/compliance/dashboard', null, adminToken);
+    const resDash = await request('/api/compliance/dashboard', {
+      headers: { Authorization: `Bearer ${adminToken}` },
+    });
     assert.equal(resDash.status, 403);
-    assert.equal(resDash.data.error.code, 'ADMIN_ISOLATION');
+    assert.equal(resDash.body.error.code, 'ADMIN_ISOLATION');
+
+    // 5. District compliance queue
+    const resDist = await request('/api/compliance/district', {
+      headers: { Authorization: `Bearer ${adminToken}` },
+    });
+    assert.equal(resDist.status, 403);
+    assert.equal(resDist.body.error.code, 'ADMIN_ISOLATION');
   });
 
   test('Cross-jurisdiction access denial: Collector of another district cannot inspect or evaluate project compliance', async () => {
-    const resEval = await makeRequest('POST', `/api/compliance/evaluate/${TEST_PROJECT_ID}`, {}, daOtherToken);
+    const resEval = await request(`/api/compliance/evaluate/${testProjectId}`, {
+      method: 'POST',
+      headers: { Authorization: `Bearer ${otherDaToken}` },
+    });
     assert.equal(resEval.status, 403);
-    assert.equal(resEval.data.error.code, 'FORBIDDEN_JURISDICTION');
+    assert.equal(resEval.body.error.code, 'FORBIDDEN_JURISDICTION');
 
-    const resGet = await makeRequest('GET', `/api/compliance/project/${TEST_PROJECT_ID}`, null, daOtherToken);
+    const resGet = await request(`/api/compliance/project/${testProjectId}`, {
+      headers: { Authorization: `Bearer ${otherDaToken}` },
+    });
     assert.equal(resGet.status, 403);
-    assert.equal(resGet.data.error.code, 'FORBIDDEN_JURISDICTION');
+    assert.equal(resGet.body.error.code, 'FORBIDDEN_JURISDICTION');
   });
 });

@@ -19,6 +19,7 @@ const testFiles = [
   path.resolve(__dirname, 'backend/projectLifecycle.test.js'),
   path.resolve(__dirname, 'backend/dashboardAndPreferences.test.js'),
   path.resolve(__dirname, 'backend/projectManagementPhase5.test.js'),
+  path.resolve(__dirname, 'backend/complianceRules.test.js'),
   path.resolve(__dirname, 'frontend/designTokens.test.js'),
   path.resolve(__dirname, 'frontend/authAndRouting.test.js'),
   path.resolve(__dirname, 'frontend/phase4Workspaces.test.js'),

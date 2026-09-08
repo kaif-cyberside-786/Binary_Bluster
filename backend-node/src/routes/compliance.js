@@ -213,11 +213,17 @@ router.get('/project/:projectId', authenticate, async (req, res, next) => {
   }
 });
 
+// Alias for plural projects endpoint per spec
+router.get('/projects/:projectId', authenticate, async (req, res, next) => {
+  req.url = `/project/${req.params.projectId}`;
+  return router.handle(req, res, next);
+});
+
 /**
- * GET /api/compliance/sc-st-status/:mpId
+ * GET /api/compliance/mp & /api/compliance/mp/:mpId & /api/compliance/sc-st-status/:mpId
  * Returns SC/ST statutory quota compliance tracking for an MP
  */
-router.get('/sc-st-status/:mpId', authenticate, async (req, res, next) => {
+router.get(['/mp', '/mp/:mpId', '/sc-st-status/:mpId'], authenticate, async (req, res, next) => {
   try {
     if (req.user.role === 'ADMIN') {
       return ApiResponse.forbidden(
@@ -227,9 +233,18 @@ router.get('/sc-st-status/:mpId', authenticate, async (req, res, next) => {
       );
     }
 
-    const requestedMpId = req.params.mpId.trim().toUpperCase();
+    let requestedMpId = req.params.mpId ? req.params.mpId.trim().toUpperCase() : null;
 
-    // Scoping check
+    // If no mpId in param (e.g. GET /api/compliance/mp), resolve for caller
+    if (!requestedMpId) {
+      if (req.user.role === 'MP') {
+        requestedMpId = req.user.user_id;
+      } else {
+        return ApiResponse.badRequest(res, 'mpId parameter is required for non-MP roles', 'MP_ID_REQUIRED');
+      }
+    }
+
+    // Scoping check for MP role
     if (req.user.role === 'MP') {
       let ownMpId = req.user.user_id;
       const alloc = await MpAllocation.findOne({
@@ -249,6 +264,73 @@ router.get('/sc-st-status/:mpId', authenticate, async (req, res, next) => {
 
     const scStStatus = await evaluateMpScStStatus(requestedMpId, req.user);
     return ApiResponse.success(res, scStStatus, 'SC/ST quota compliance status retrieved successfully');
+  } catch (err) {
+    next(err);
+  }
+});
+
+/**
+ * GET /api/compliance/district
+ * Returns review queue of non-compliant and review-required projects in district jurisdiction
+ */
+router.get('/district', authenticate, async (req, res, next) => {
+  try {
+    if (req.user.role === 'ADMIN') {
+      return ApiResponse.forbidden(
+        res,
+        'Access denied: Admin isolation prohibits viewing compliance telemetry',
+        'ADMIN_ISOLATION'
+      );
+    }
+
+    const { role, jurisdiction, user_id } = req.user;
+    const projectFilter = {};
+
+    if (role === 'DISTRICT_AUTHORITY') {
+      projectFilter.district = new RegExp(`^${jurisdiction?.district}$`, 'i');
+    } else if (role === 'IMPLEMENTING_AGENCY') {
+      const agencyDistrict = jurisdiction?.district || (user_id?.includes('IND') ? 'Indore' : null);
+      if (agencyDistrict) projectFilter.district = new RegExp(`^${agencyDistrict}$`, 'i');
+    } else if (role === 'STATE_NODAL_AUTHORITY') {
+      projectFilter.state = new RegExp(`^${jurisdiction?.state}$`, 'i');
+    }
+
+    const projects = await Project.find(projectFilter)
+      .select('project_id district state category title status sanctioned_cost estimated_cost')
+      .lean();
+    const projectIds = projects.map((p) => p.project_id);
+
+    const findings = await ComplianceFinding.find({
+      project_id: { $in: projectIds },
+      status: { $in: ['NON_COMPLIANT', 'REVIEW_REQUIRED'] },
+    })
+      .sort({ severity: -1, evaluated_at: -1 })
+      .lean();
+
+    const projectMap = new Map();
+    for (const p of projects) {
+      projectMap.set(p.project_id, p);
+    }
+
+    const queue = findings.map((f) => {
+      const prj = projectMap.get(f.project_id);
+      return {
+        ...f,
+        project_title: prj?.title || 'Unknown Title',
+        category: prj?.category,
+        project_status: prj?.status,
+        cost: prj?.sanctioned_cost || prj?.estimated_cost,
+      };
+    });
+
+    return ApiResponse.success(
+      res,
+      {
+        total_flagged_items: queue.length,
+        items: queue,
+      },
+      'District compliance queue retrieved successfully'
+    );
   } catch (err) {
     next(err);
   }
