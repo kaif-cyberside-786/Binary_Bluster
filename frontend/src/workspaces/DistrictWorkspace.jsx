@@ -5,6 +5,7 @@ import WorkspaceLayout from './WorkspaceLayout';
 import Card from '../components/Card';
 import Button from '../components/Button';
 import { StatusBadge } from '../components/Badge';
+import ProjectDetailModal from '../components/ProjectDetailModal';
 
 export function DistrictWorkspace() {
   const { user, authFetch } = useAuth();
@@ -19,9 +20,13 @@ export function DistrictWorkspace() {
   // Status filter
   const [statusFilter, setStatusFilter] = useState('ALL');
 
+  // 360 view modal state
+  const [selected360ProjectId, setSelected360ProjectId] = useState(null);
+
   // Decision modal state
   const [reviewProject, setReviewProject] = useState(null);
   const [decisionReason, setDecisionReason] = useState('');
+  const [assignedAgencyId, setAssignedAgencyId] = useState('PWD-INDORE-01');
   const [decisionSubmitting, setDecisionSubmitting] = useState(false);
   const [modalError, setModalError] = useState(null);
 
@@ -86,6 +91,7 @@ export function DistrictWorkspace() {
   const handleOpenReview = (p) => {
     setReviewProject(p);
     setDecisionReason('');
+    setAssignedAgencyId(p.implementing_agency_id || 'PWD-INDORE-01');
     setModalError(null);
   };
 
@@ -104,6 +110,7 @@ export function DistrictWorkspace() {
         body: JSON.stringify({
           decision: decisionType,
           reason: decisionReason.trim(),
+          implementing_agency_id: assignedAgencyId,
         }),
       });
 
@@ -363,6 +370,7 @@ export function DistrictWorkspace() {
                   <th style={{ padding: '10px 12px', fontWeight: 600, color: 'var(--color-muted)' }}>Cost</th>
                   <th style={{ padding: '10px 12px', fontWeight: 600, color: 'var(--color-muted)' }}>Status</th>
                   <th style={{ padding: '10px 12px', fontWeight: 600, color: 'var(--color-muted)' }}>Date</th>
+                  <th style={{ padding: '10px 12px', fontWeight: 600, color: 'var(--color-muted)', textAlign: 'right' }}>Actions</th>
                 </tr>
               </thead>
               <tbody>
@@ -379,6 +387,15 @@ export function DistrictWorkspace() {
                     </td>
                     <td style={{ padding: '10px 12px', color: 'var(--color-muted)', whiteSpace: 'nowrap' }}>
                       {new Date(p.created_at).toLocaleDateString('en-IN')}
+                    </td>
+                    <td style={{ padding: '10px 12px', textAlign: 'right' }}>
+                      <Button
+                        size="sm"
+                        variant="secondary"
+                        onClick={() => setSelected360ProjectId(p.project_id)}
+                      >
+                        View 360°
+                      </Button>
                     </td>
                   </tr>
                 ))}
@@ -488,6 +505,33 @@ export function DistrictWorkspace() {
                 </div>
               </div>
 
+              {/* Implementing Agency Assignment */}
+              <div style={{ marginBottom: 'var(--space-4)' }}>
+                <label style={{ display: 'block', fontSize: 'var(--font-size-sm)', fontWeight: 600, marginBottom: '6px' }}>
+                  Assign Implementing Agency (On Sanction)
+                </label>
+                <select
+                  value={assignedAgencyId}
+                  onChange={(e) => setAssignedAgencyId(e.target.value)}
+                  style={{
+                    width: '100%',
+                    padding: '8px 12px',
+                    borderRadius: 'var(--radius-sm)',
+                    border: '1px solid var(--color-border)',
+                    fontSize: 'var(--font-size-sm)',
+                    backgroundColor: '#FFFFFF',
+                  }}
+                >
+                  <option value="PWD-INDORE-01">Public Works Department (PWD-INDORE-01 / AG-PWD-01)</option>
+                  <option value="RES-INDORE-01">Rural Engineering Services (RES-INDORE-01)</option>
+                  <option value="CPWD-INDORE-01">Central Public Works Department (CPWD)</option>
+                  <option value="MP-RDC-01">MP Road Development Corporation (MP-RDC)</option>
+                </select>
+                <div style={{ fontSize: '11px', color: 'var(--color-muted)', marginTop: '4px' }}>
+                  Designated public agency responsible for technical sanction, physical progress milestones, and utilization certificates.
+                </div>
+              </div>
+
               {/* Mandatory Reason Input */}
               <div style={{ marginBottom: 'var(--space-5)' }}>
                 <label style={{ display: 'block', fontSize: 'var(--font-size-sm)', fontWeight: 600, marginBottom: '6px' }}>
@@ -566,6 +610,19 @@ export function DistrictWorkspace() {
             </div>
           </div>
         </div>
+      )}
+
+      {/* Project 360 & Disbursements Modal */}
+      {selected360ProjectId && (
+        <ProjectDetailModal
+          projectId={selected360ProjectId}
+          isOpen={Boolean(selected360ProjectId)}
+          onClose={() => setSelected360ProjectId(null)}
+          onProjectUpdated={() => {
+            fetchDashboardData();
+            fetchProjects();
+          }}
+        />
       )}
     </WorkspaceLayout>
   );

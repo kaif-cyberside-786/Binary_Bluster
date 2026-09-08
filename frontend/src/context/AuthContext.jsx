@@ -117,10 +117,10 @@ export function AuthProvider({ children }) {
   // Helper for authenticated API calls with token attachment
   const authFetch = useCallback(
     async (url, options = {}) => {
-      const headers = {
-        'Content-Type': 'application/json',
-        ...(options.headers || {}),
-      };
+      const headers = { ...(options.headers || {}) };
+      if (!(options.body instanceof FormData) && !headers['Content-Type']) {
+        headers['Content-Type'] = 'application/json';
+      }
 
       if (accessToken) {
         headers.Authorization = `Bearer ${accessToken}`;

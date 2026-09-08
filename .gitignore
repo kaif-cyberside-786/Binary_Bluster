@@ -23,6 +23,10 @@ yarn-error.log*
 logs/
 *.log
 
+# Uploaded document binaries (Phase 5)
+uploads/
+*/uploads/
+
 # Editor & OS files
 .DS_Store
 Thumbs.db

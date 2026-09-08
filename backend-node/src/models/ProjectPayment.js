@@ -86,7 +86,17 @@ const projectPaymentSchema = new mongoose.Schema(
 
 projectPaymentSchema.index({ project_id: 1, payment_date: -1 });
 
-projectPaymentSchema.plugin(appendOnlyPlugin);
+// Immutability: amounts and installment numbers are strictly write-once.
+// Only administrative status transitions (PENDING -> APPROVED -> DISBURSED) are permitted.
+projectPaymentSchema.plugin(appendOnlyPlugin, {
+  allowedUpdateFields: [
+    'status',
+    'approved_by',
+    'payment_date',
+    'sanction_order_ref',
+    'voucher_number',
+  ],
+});
 
 const ProjectPayment = mongoose.model('ProjectPayment', projectPaymentSchema);
 

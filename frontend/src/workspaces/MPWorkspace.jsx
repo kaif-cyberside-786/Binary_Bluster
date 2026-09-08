@@ -5,6 +5,7 @@ import WorkspaceLayout from './WorkspaceLayout';
 import Card from '../components/Card';
 import Button from '../components/Button';
 import { StatusBadge } from '../components/Badge';
+import ProjectDetailModal from '../components/ProjectDetailModal';
 
 const CATEGORIES = [
   'Drinking Water',
@@ -655,82 +656,17 @@ export function MPWorkspace() {
         </div>
       )}
 
-      {/* Modal: View Project Details */}
+      {/* Modal: Project 360 View */}
       {selectedProject && (
-        <div
-          style={{
-            position: 'fixed',
-            top: 0,
-            left: 0,
-            right: 0,
-            bottom: 0,
-            backgroundColor: 'rgba(0, 0, 0, 0.5)',
-            display: 'flex',
-            alignItems: 'center',
-            justifyContent: 'center',
-            zIndex: 1000,
-            padding: 'var(--space-4)',
+        <ProjectDetailModal
+          projectId={selectedProject.project_id}
+          isOpen={Boolean(selectedProject)}
+          onClose={() => setSelectedProject(null)}
+          onProjectUpdated={() => {
+            fetchDashboardData();
+            fetchProjects();
           }}
-        >
-          <div
-            style={{
-              backgroundColor: 'var(--color-surface)',
-              borderRadius: 'var(--radius-md)',
-              border: '1px solid var(--color-border)',
-              width: '100%',
-              maxWidth: '550px',
-              maxHeight: '85vh',
-              overflowY: 'auto',
-              padding: 'var(--space-5)',
-            }}
-          >
-            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', marginBottom: 'var(--space-4)' }}>
-              <div>
-                <div style={{ fontSize: '11px', fontWeight: 700, color: 'var(--color-muted)' }}>PROJECT DETAIL</div>
-                <h3 style={{ color: 'var(--color-primary)', margin: '2px 0 0 0' }}>{selectedProject.title}</h3>
-              </div>
-              <button
-                type="button"
-                onClick={() => setSelectedProject(null)}
-                style={{ background: 'none', border: 'none', fontSize: '18px', cursor: 'pointer', color: 'var(--color-muted)' }}
-              >
-                ✕
-              </button>
-            </div>
-
-            <div style={{ display: 'flex', flexDirection: 'column', gap: 'var(--space-3)', fontSize: 'var(--font-size-sm)' }}>
-              <div>
-                <strong>Project ID:</strong> <code>{selectedProject.project_id}</code>
-              </div>
-              <div>
-                <strong>Status:</strong> <StatusBadge status={selectedProject.status} />
-              </div>
-              <div>
-                <strong>Category:</strong> {selectedProject.category}
-              </div>
-              <div>
-                <strong>Estimated Cost:</strong> ₹{(selectedProject.estimated_cost || 0).toLocaleString('en-IN')}
-              </div>
-              {selectedProject.sanctioned_cost && (
-                <div>
-                  <strong>Sanctioned Cost:</strong> ₹{selectedProject.sanctioned_cost.toLocaleString('en-IN')}
-                </div>
-              )}
-              <div>
-                <strong>District:</strong> {selectedProject.district}, {selectedProject.state}
-              </div>
-              <div>
-                <strong>Recommended Date:</strong> {new Date(selectedProject.created_at).toLocaleString('en-IN')}
-              </div>
-            </div>
-
-            <div style={{ marginTop: 'var(--space-5)', textAlign: 'right' }}>
-              <Button size="sm" variant="secondary" onClick={() => setSelectedProject(null)}>
-                Close
-              </Button>
-            </div>
-          </div>
-        </div>
+        />
       )}
     </WorkspaceLayout>
   );

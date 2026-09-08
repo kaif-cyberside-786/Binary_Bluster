@@ -3,11 +3,14 @@ import { useAuth } from '../context/AuthContext';
 import WorkspaceLayout from './WorkspaceLayout';
 import Card from '../components/Card';
 import { StatusBadge } from '../components/Badge';
+import Button from '../components/Button';
+import ProjectDetailModal from '../components/ProjectDetailModal';
 
 export function AgencyWorkspace() {
   const { user, authFetch } = useAuth();
   const [data, setData] = useState(null);
   const [loading, setLoading] = useState(true);
+  const [selectedProjectId, setSelectedProjectId] = useState(null);
 
   const navItems = [
     { label: 'Agency Dashboard', key: 'dashboard' },
@@ -130,6 +133,7 @@ export function AgencyWorkspace() {
                   <th style={{ padding: '10px 12px', fontWeight: 600, color: 'var(--color-muted)' }}>Category</th>
                   <th style={{ padding: '10px 12px', fontWeight: 600, color: 'var(--color-muted)' }}>Sanctioned Cost</th>
                   <th style={{ padding: '10px 12px', fontWeight: 600, color: 'var(--color-muted)' }}>Status</th>
+                  <th style={{ padding: '10px 12px', fontWeight: 600, color: 'var(--color-muted)', textAlign: 'right' }}>Actions</th>
                 </tr>
               </thead>
               <tbody>
@@ -144,6 +148,15 @@ export function AgencyWorkspace() {
                     <td style={{ padding: '10px 12px' }}>
                       <StatusBadge status={p.status} />
                     </td>
+                    <td style={{ padding: '10px 12px', textAlign: 'right' }}>
+                      <Button
+                        size="sm"
+                        variant="secondary"
+                        onClick={() => setSelectedProjectId(p.project_id)}
+                      >
+                        Manage 360°
+                      </Button>
+                    </td>
                   </tr>
                 ))}
               </tbody>
@@ -151,6 +164,16 @@ export function AgencyWorkspace() {
           </div>
         )}
       </Card>
+
+      {/* Project 360 & Execution Modal */}
+      {selectedProjectId && (
+        <ProjectDetailModal
+          projectId={selectedProjectId}
+          isOpen={Boolean(selectedProjectId)}
+          onClose={() => setSelectedProjectId(null)}
+          onProjectUpdated={fetchAgencyData}
+        />
+      )}
     </WorkspaceLayout>
   );
 }

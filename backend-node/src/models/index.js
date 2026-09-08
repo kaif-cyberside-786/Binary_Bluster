@@ -61,6 +61,12 @@ const {
 } = require('./AuditLog');
 const { UserPreference } = require('./UserPreference');
 const { Document, DOCUMENT_TYPES } = require('./Document');
+const {
+  ComplianceFinding,
+  COMPLIANCE_STATUSES,
+  COMPLIANCE_SEVERITIES,
+  COMPLIANCE_RULE_CATEGORIES,
+} = require('./ComplianceFinding');
 
 module.exports = {
   // Models
@@ -88,6 +94,7 @@ module.exports = {
   AuditLog,
   UserPreference,
   Document,
+  ComplianceFinding,
 
   // Canonical Constants & Enums
   ROLES,
@@ -109,5 +116,8 @@ module.exports = {
   NOTIFICATION_TYPES,
   AUDIT_ENTITY_TYPES,
   DOCUMENT_TYPES,
+  COMPLIANCE_STATUSES,
+  COMPLIANCE_SEVERITIES,
+  COMPLIANCE_RULE_CATEGORIES,
 };
 

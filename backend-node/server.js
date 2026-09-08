@@ -16,6 +16,12 @@ async function startServer() {
   if (getDatabaseStatus() === 'connected') {
     await seedDefaultUsers();
     try {
+      const { seedScStReference } = require('./src/utils/seedScStReference');
+      await seedScStReference();
+    } catch (err) {
+      logger.warn('Could not seed SC/ST references on startup', { error: err.message });
+    }
+    try {
       const { MpAllocation } = require('./src/models/MpAllocation');
       const allocationCount = await MpAllocation.countDocuments();
       if (allocationCount === 0) {

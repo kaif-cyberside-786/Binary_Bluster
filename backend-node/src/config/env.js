@@ -33,6 +33,12 @@ const config = {
   // Account Lockout
   lockoutMaxAttempts: parseInt(process.env.LOCKOUT_MAX_ATTEMPTS, 10) || 5,
   lockoutDurationMinutes: parseInt(process.env.LOCKOUT_DURATION_MINUTES, 10) || 15,
+
+  // Document Storage (Phase 5)
+  uploadDir: process.env.UPLOAD_DIR
+    ? path.resolve(process.env.UPLOAD_DIR)
+    : path.resolve(__dirname, '../../uploads'),
+  maxFileSizeMb: parseInt(process.env.MAX_FILE_SIZE_MB, 10) || 10,
 };
 
 module.exports = config;

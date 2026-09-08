@@ -48,7 +48,7 @@ const DEFAULT_USERS = [
   {
     user_id: 'AG-PWD-01',
     official_email: 'ee.pwd.indore@mp.gov.in',
-    password: 'AgencyPassword@123',
+    password: 'Agency@12345',
     full_name: 'Executive Engineer (PWD Division 1)',
     role: 'IMPLEMENTING_AGENCY',
     designation: 'Executive Engineer',
@@ -56,6 +56,8 @@ const DEFAULT_USERS = [
     jurisdiction: {
       level: 'AGENCY',
       agency_id: 'PWD-INDORE-01',
+      district: 'Indore',
+      state: 'Madhya Pradesh',
     },
   },
   {
@@ -114,11 +116,29 @@ async function seedDefaultUsers() {
         await user.save();
         logger.info(`Seeded user account: ${u.user_id} (${u.role})`);
       } else {
-        // Ensure specified test credentials remain synchronized
+        // Ensure specified test credentials and jurisdiction remain synchronized
         existing.password_hash = password_hash;
         existing.is_active = true;
+        existing.jurisdiction = u.jurisdiction;
         await existing.save();
       }
+    }
+
+    // Ensure existing sanctioned works in Indore have implementing_agency_id assigned
+    const { Project } = require('../models');
+    if (Project) {
+      await Project.updateMany(
+        {
+          district: new RegExp('^indore$', 'i'),
+          status: { $in: ['SANCTIONED', 'IN_PROGRESS', 'COMPLETED'] },
+          $or: [
+            { implementing_agency_id: null },
+            { implementing_agency_id: { $exists: false } },
+            { implementing_agency_id: '' },
+          ],
+        },
+        { $set: { implementing_agency_id: 'PWD-INDORE-01' } }
+      );
     }
 
     logger.info('Default user accounts verified and synchronized for 7 platform roles.');

@@ -238,7 +238,109 @@ AI compares, detects anomalies, calculates/receives risk signals, explains findi
   - **Phase 2 (Auth & RBAC)**: Login, bcrypt hashing, JWT access/refresh rotation, server-side SVG CAPTCHA, 5-attempt account lockout, password reset, 7 role workspaces, and Admin user management verified. Express serves as the sole authorization boundary.
   - **Phase 3 (Domain Data Model)**: 23 collections/models established, write-once append-only plugin enforced, canonical status enums intact, 542 real MP allocation records loaded with `is_real_government_data: true`, and `mp_attention_scores` confirmed as a runtime-derived view rather than a stored collection.
   - **Phase 4 (Lifecycle & Dashboards)**: Canonical project state transitions (`DISTRICT_REVIEW → SANCTIONED / HELD / CLARIFICATION`), mandatory 5-character reason enforcement, write-once `officer_decisions` and `audit_logs`, jurisdiction-scoped dashboards for all 7 roles, non-blocking `user_preferences`, and strict Admin Isolation across backend and frontend verified.
-- **Readiness**: Repository is clean, stable, and ready to proceed to **Phase 5: Project Management, Engineering, Progress, Payments & Documents**. Phase 5 has NOT been started.
+- **Readiness**: Repository is clean, stable, and ready to proceed to **Phase 5: Project Management, Engineering, Progress, Payments & Documents**.
+
+### Phase 5: Project Management, Engineering, Progress, Payments & Documents
+- **Status**: Complete
+- **Exit Checklist**:
+  - [x] Requirements completed
+  - [x] Code reviewed
+  - [x] Feature tested
+  - [x] Security/permissions verified where applicable
+  - [x] Documentation/memory updated where applicable
+  - [x] No known blocking issues
+- **Done**:
+  - Implementation plan created, reviewed, and approved.
+  - Multipart document upload & storage infrastructure:
+    - Installed `multer` dependency in `backend-node`.
+    - Added `uploads/` and `*/uploads/` to `.gitignore`.
+    - Configured `uploadDir` and `maxFileSizeMb` (default 10MB) in `config/env.js`.
+    - Implemented `backend-node/src/middleware/upload.js` with disk-based storage outside MongoDB, MIME type filtering (PDF, PNG, JPEG, WEBP), and automatic SHA-256 cryptographic checksum hashing.
+  - Data models & immutability extensions:
+    - Enhanced `appendOnlyPlugin.js` with `options.allowedUpdateFields` to support controlled administrative transitions on payments while strictly blocking mutations to financial amounts, installments, or project IDs, and preventing document/record deletion.
+    - Updated `ProjectPayment.js` with permitted update fields (`status`, `approved_by`, `payment_date`, `sanction_order_ref`, `voucher_number`).
+    - Added `'PROGRESS'` and `'DOCUMENT'` to `AUDIT_ENTITY_TYPES` in `AuditLog.js`.
+    - Synchronized `AG-PWD-01` password in `seedUsers.js` (`Agency@12345`).
+  - Backend project management & sub-resource endpoints in `backend-node/src/routes/projects.js`:
+    - `POST /api/projects/:projectId/engineering-reports`: Submits detailed project report versions (`v1`, `v2`, ...) with monotonic version incrementing, detailed estimates, technical sanction references, vetting agency, and audit log.
+    - `GET /api/projects/:projectId/engineering-reports`: Lists versioned engineering reports in chronological order.
+    - `POST /api/projects/:projectId/progress`: Appends physical progress records (`percent_complete` 0–100, stage milestones, remarks), automatically transitions project status to `IN_PROGRESS`, and records audit log.
+    - `GET /api/projects/:projectId/progress`: Retrieves historical progress timeline.
+    - `POST /api/projects/:projectId/payments`: Raises payment installments (`installment_number`, `amount`, initial status `PENDING`, `voucher_number`, description).
+    - `GET /api/projects/:projectId/payments`: Lists payment installments with status.
+    - `PATCH /api/projects/:projectId/payments/:paymentId`: District Authority (`DISTRICT_AUTHORITY`) decision endpoint to `APPROVE` or `REJECT` pending payments with mandatory substantive reason (min 5 chars), jurisdiction check, and append-only `officer_decisions` & `audit_logs`.
+    - `POST /api/projects/:projectId/utilization-certificates`: Files Utilization Certificates (UC) linked to payments or projects with certified amount and audit log.
+    - `GET /api/projects/:projectId/utilization-certificates`: Lists filed and draft UCs.
+    - `POST /api/projects/:projectId/documents`: Multipart file upload storing binary on disk, persisting metadata and SHA-256 hash in DB, and recording audit log.
+    - `GET /api/projects/:projectId/documents`: Lists project document metadata.
+    - Upgraded `GET /api/projects/:projectId`: Project 360 data envelope returning project metadata, initial recommendation, decisions audit, engineering versions, progress timeline, payment installments, UCs, and document metadata. Strict Admin Isolation (403 `ADMIN_ISOLATION`).
+  - Controlled document streaming & download API in `backend-node/src/routes/documents.js`:
+    - `GET /api/documents/:documentId/download`: Authorized file streaming endpoint validating JWT, role, and jurisdiction scope.
+    - Enforces strict Admin Isolation (403 `ADMIN_ISOLATION`) per `rules.md` §10.
+    - Blocks static or unauthenticated access.
+  - Frontend components & workspace integrations:
+    - Created `frontend/src/components/ProjectDetailModal.jsx`: Comprehensive 6-tab Project 360 modal (Overview & MP Recommendation, Engineering DPR Versions, Physical Progress Timeline, Disbursements & Payments, UCs & Controlled Documents, Administrative Audit Trail). Includes role-scoped action triggers (DPR submission, progress logging, payment raising, UC filing, document upload, and District Authority payment approval/rejection modal).
+    - Updated `frontend/src/context/AuthContext.jsx`: Improved `authFetch` to preserve `FormData` multipart boundary headers without forcing `Content-Type: application/json`.
+    - Updated `frontend/src/workspaces/AgencyWorkspace.jsx`: Added "Manage 360°" action buttons to assigned works table and integrated `ProjectDetailModal` for executing agency workflows.
+    - Updated `frontend/src/workspaces/DistrictWorkspace.jsx`: Added "View 360°" action button to project table and integrated `ProjectDetailModal` with live payment approval workflow.
+    - Updated `frontend/src/workspaces/MPWorkspace.jsx`: Replaced basic view modal with `ProjectDetailModal` for full Project 360 visibility.
+  - Automated tests & verification:
+    - Added `tests/backend/projectManagementPhase5.test.js`: 9 backend integration tests covering engineering version history, estimate validation, progress logging, payment installment creation, payment approval by DA with reason, cross-jurisdiction rejection, UC filing, multipart upload with SHA-256, secure streaming download with Admin 403, and complete Project 360 aggregation.
+    - Added `tests/frontend/phase5ProjectDetail.test.js`: 6 frontend tests covering component exports, 6 Project 360 tabs, API connections, and workspace integrations.
+    - Unified test runner `npm test`: **94/94 tests passing** across all 12 suites (100% green).
+    - Frontend build verified: `npm --prefix frontend run build` completed cleanly in ~2s with zero errors.
+- **Not done / remaining**:
+  - None (Phase 5 complete and verified; ready for Phase 6: Deterministic Rule Engine, Invariants & Discrepancy Detection).
+  - Notes on Agency Assignment & Phase 5 Flow:
+    - `seedUsers.js` synchronized with `district: 'Indore'`, `state: 'Madhya Pradesh'`, and `agency_id: 'PWD-INDORE-01'` for `AG-PWD-01`.
+    - Automatically assigned `implementing_agency_id: 'PWD-INDORE-01'` on `SANCTION` decisions and backfilled existing sanctioned Indore works in database.
+    - Updated `DistrictWorkspace.jsx` Review modal with an explicit "Assign Implementing Agency" selector on sanction.
+    - Updated `GET /api/dashboard/agency` and `GET /api/projects` to query both `agency_id`, `user_id`, and active sanctioned works within the agency's district.
+    - Resolved progress stage validation in `projects.js` and `ProjectDetailModal.jsx` to map canonical stages (`FOUNDATION`, `SUPERSTRUCTURE`, etc.) and support remarks/physical_summary fallback.
+    - Live verified end-to-end: `AG-PWD-01` sees assigned works on dashboard, opens Project 360 modal, submits DPR v1, logs physical progress (auto-transitions to `IN_PROGRESS`), raises payment installment, files UC, and uploads multipart documents with authorized download.
+
+### Phase 6: Compliance & Deterministic Monitoring
+- **Status**: In Progress
+- **Exit Checklist**:
+  - [ ] Requirements completed
+  - [ ] Code reviewed
+  - [ ] Feature tested
+  - [ ] Security/permissions verified where applicable
+  - [ ] Documentation/memory updated where applicable
+  - [ ] No known blocking issues
+- **Done / Verified**:
+  - `ComplianceFinding.js` schema (`compliance_findings` collection) implementing canonical compliance finding model per `architecture.md` §10.1 and `design.md` §5.19 (`COMPLIANT`, `REVIEW_REQUIRED`, `NON_COMPLIANT`).
+  - Pure-function deterministic compliance rules implemented in `backend-node/src/services/compliance/`:
+    - `REQUIRED_FIELDS` (mandatory fields & scheme eligibility)
+    - `DOC_COMPLETENESS` (DPR and technical estimate presence for sanctioned works)
+    - `UC_OVERDUE` (utilization certificate overdue tracking against 90-day CAG norm)
+    - `PAYMENT_PROGRESS_MISMATCH` (financial disbursement vs physical progress gap tracking at 20% and 40% thresholds)
+    - `COST_DRIFT` (latest engineering DPR estimate vs approved outlay at 10% and 25% thresholds)
+    - `STALLED_PROGRESS` (timeline and progress staleness at 90-day and 180-day thresholds)
+    - `SC_ST_MIX` (continuous statutory earmarking evaluation against 15% SC and 7.5% ST quotas)
+  - Evaluators implemented: `evaluator.js` (`evaluateProject`) and `scStEvaluator.js` (`evaluateMpScStStatus`).
+  - Baseline census data seeder for 14 MP constituencies in `backend-node/src/utils/seedScStReference.js` wired into `server.js`.
+  - Scoped API routes in `backend-node/src/routes/compliance.js` mounted at `/api/compliance`:
+    - `POST /api/compliance/evaluate/:projectId` (on-demand evaluation)
+    - `GET /api/compliance/project/:projectId` (project compliance detail)
+    - `GET /api/compliance/sc-st-status/:mpId` (continuous statutory quota tracking)
+    - `GET /api/compliance/dashboard` (role-scoped compliance aggregates)
+    - `GET /api/projects/:projectId` includes compliance findings/summary
+    - `GET /api/projects/:projectId/compliance` alias
+    - Strict Admin Isolation enforced (403 `ADMIN_ISOLATION` on all compliance endpoints per `rules.md` §10).
+- **Not done / remaining (Blocking Exit Checklist)**:
+  - Frontend UI integration incomplete:
+    - Tab 7 ("Compliance & Scheme Norms") in `frontend/src/components/ProjectDetailModal.jsx` using `ComplianceBadge` not yet added.
+    - SC/ST Quota Compliance card in `frontend/src/workspaces/MPWorkspace.jsx` not yet added.
+    - Compliance Overview widget and project table status badge in `frontend/src/workspaces/DistrictWorkspace.jsx` not yet added.
+  - Automated test integration incomplete:
+    - `tests/backend/complianceRules.test.js` created but needs successful execution to green.
+    - `tests/frontend/phase6Compliance.test.js` not yet created.
+    - Neither test suite is registered in `tests/runAll.js`.
+- **Notes (Audited 2026-09-08)**:
+  - Documentation Compliance Audit performed. Phases 1–5 independently verified as 100% complete and compliant (94/94 tests passing).
+  - Phase 6 is actively In Progress. Backend engine is built; frontend integration and test suite completion remain required before exit checklist can be marked Complete. Phase 7 (n8n) and Phase 8+ (AI services) have not been started.
+
 
 
 

@@ -10,6 +10,8 @@ const allocationRoutes = require('./allocations');
 const projectRoutes = require('./projects');
 const dashboardRoutes = require('./dashboard');
 const userPreferenceRoutes = require('./userPreferences');
+const documentRoutes = require('./documents');
+const complianceRoutes = require('./compliance');
 
 const router = express.Router();
 
@@ -27,6 +29,12 @@ router.use('/allocations', allocationRoutes);
 
 // Mount project lifecycle routes (/api/projects/...)
 router.use('/projects', projectRoutes);
+
+// Mount document streaming routes (/api/documents/...)
+router.use('/documents', documentRoutes);
+
+// Mount compliance monitoring routes (/api/compliance/...)
+router.use('/compliance', complianceRoutes);
 
 // Mount dashboard routes (/api/dashboard/...)
 router.use('/dashboard', dashboardRoutes);

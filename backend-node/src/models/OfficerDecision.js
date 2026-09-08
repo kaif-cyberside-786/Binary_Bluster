@@ -18,6 +18,9 @@ const DECISION_TYPES = [
   'ESCALATE_TO_MINISTRY',
   'APPROVE_PAYMENT',
   'HOLD_PAYMENT',
+  'ASSIGN_AGENCY',
+  'MARK_IN_PROGRESS',
+  'MARK_COMPLETED',
 ];
 
 const officerDecisionSchema = new mongoose.Schema(
