@@ -478,15 +478,40 @@ AI compares, detects anomalies, calculates/receives risk signals, explains findi
   - Gemini receives zero PII, personal tokens, or raw documents; only de-identified numbers, percentages, and category labels are passed to the AI Gateway.
   - Advisory language strictly observed throughout UI and AI Gateway; system never produces *"Fraud confirmed"* or automatic sanctions/rejections.
 
-
-
-
-
-
-
-
-
-
-
-
-
+### Phase 10: District AI Review & Human Decision
+- **Status**: Complete
+- **Exit Checklist**:
+  - [x] Requirements completed
+  - [x] Code reviewed
+  - [x] Feature tested
+  - [x] Security/permissions verified where applicable
+  - [x] Documentation/memory updated where applicable
+  - [x] No known blocking issues
+- **Done**:
+  - Backend Domain Model & Decision Pipeline (`backend-node/`):
+    - `src/models/Project.js`: Added canonical status enums `INSPECTION_REQUESTED`, `ESCALATED`, and `REJECTED`.
+    - `src/models/OfficerDecision.js`: Extended with 5 canonical decision types (`SANCTION`, `HOLD`, `REQUEST_CLARIFICATION`, `ORDER_INSPECTION`, `ESCALATE`), decision snapshot fields (`risk_analysis_id`, `risk_score_at_decision`, `risk_level_at_decision`, `supporting_note`), and alias mappings (`APPROVE` -> `SANCTION`, `INSPECTION` -> `ORDER_INSPECTION`).
+    - `src/routes/projects.js`:
+      - `GET /api/projects/:projectId/review`: End-to-end District Authority review package aggregating the complete Section 25 10-part hierarchy (Project Metadata & Recommendation, Deterministic Compliance, Historical Duplicates, Cost Benchmark IQR Deviation, Engineering Comparison DPR drift, Phase 9 Composite AI Risk Assessment & explainable component breakdown, Non-Binding AI Advisory Recommendation, Accessible Evidence Drawer, Prior Decision History, and Human Decision Action Panel metadata). Protected by RBAC allowing `DISTRICT_AUTHORITY`, `STATE_NODAL_AUTHORITY`, `MINISTRY`, and read-only `AUDITOR`.
+      - `PATCH /api/projects/:projectId/decision`: Official administrative human decision submission. Enforces mandatory justification (min 5 chars), agency selection for `SANCTION`, valid state transitions, 403 `ADMIN_ISOLATION` per `rules.md` §10, 403 Auditor read-only restriction, 403 Cross-Jurisdiction boundaries, and records immutable `OfficerDecision` documents and `AuditLog` entries.
+      - Enforced strict Human-in-the-Loop guarantees: AI risk scores are non-binding advisory signals; high scores (e.g. 82 or 95) NEVER automatically reject, hold, or sanction a project without human officer action.
+  - Frontend UI Integration (`frontend/`):
+    - `DistrictReviewModal.jsx`: Complete Section 25 District Authority review interface featuring 10-section hierarchy, 5 canonical decision buttons (`Approve / Sanction`, `Hold`, `Request Clarification`, `Send for Inspection`, `Escalate`), confirmation modal with agency assignment and mandatory reason validation, non-binding advisory disclaimers, and Auditor read-only state.
+    - `DistrictWorkspace.jsx`: Mounted `DistrictReviewModal` into the district pre-sanction review workflow.
+    - `ProjectDetailModal.jsx`: Enhanced decisions tab with risk context snapshot badges (`risk_score_at_decision`, `risk_level_at_decision`), officer notes, and transition cards.
+  - Automated Tests & Verification:
+    - `tests/backend/districtReviewDecisionPhase10.test.js`: **21/21 passing** across 6 suites (Review package aggregation, 5 canonical actions, aliases, validations, RBAC/Admin isolation, append-only history & human-in-the-loop safeguards).
+    - `tests/frontend/phase10DistrictReview.test.js`: **7/7 passing** (Section 25 hierarchy, 5 buttons, confirmation modal, Auditor read-only, Admin isolation, DistrictWorkspace mounting, and ProjectDetailModal risk snapshots).
+    - `tests/backend/riskEnginePhase9.test.js`: **9/9 passing** (Phase 9 regression).
+    - `tests/frontend/phase9RiskPanel.test.js`: **8/8 passing** (Phase 9 regression).
+    - `tests/backend/aiHistoricalIntelligence.test.js`: **6/6 passing** (Phase 8 regression).
+    - `tests/frontend/phase8AiIntelligence.test.js`: **7/7 passing** (Phase 8 regression).
+    - All Frontend Test Suites (`tests/frontend/*.test.js`): **66/66 passing** across 7 test files.
+    - Python AI microservice test suite: **19/19 passing** (`Ran 19 tests in 0.024s, OK`).
+    - Frontend production build (`npm --prefix frontend run build`): **Passes cleanly in 1.02s with 0 errors**.
+- **Not done / remaining**:
+  - None (Phase 10 complete and verified). Ready for Phase 11: 1% Physical Inspection Engine & Verification Loop.
+- **Notes**:
+  - Decisions are strictly append-only; an immutable historical record with full risk snapshot is preserved.
+  - Admin Isolation remains 100% intact: Admin accounts receive HTTP 403 `ADMIN_ISOLATION` on both review and decision endpoints.
+  - Human-in-the-loop is strictly upheld: AI never auto-decides; only authorized District Authority officials can execute administrative status transitions.

@@ -467,44 +467,249 @@ router.get('/:projectId/compliance', authenticate, async (req, res, next) => {
 });
 
 /**
+ * GET /api/projects/:projectId/review
+ * Phase 10: Complete District Authority Review Package
+ * Combines project metadata, recommendation, deterministic compliance, historical duplicates,
+ * cost benchmarks, engineering comparison, Phase 9 risk score & breakdown, advisory recommendations,
+ * and chronological decision history.
+ * Protected: DISTRICT_AUTHORITY, STATE_NODAL_AUTHORITY, MINISTRY, AUDITOR (Admin Isolation enforced).
+ */
+router.get(
+  '/:projectId/review',
+  authenticate,
+  authorize('DISTRICT_AUTHORITY', 'STATE_NODAL_AUTHORITY', 'MINISTRY', 'AUDITOR', 'ADMIN'),
+  async (req, res, next) => {
+  try {
+    const { role, jurisdiction } = req.user;
+    const projectId = req.params.projectId.trim().toUpperCase();
+
+    // Admin Isolation enforcement (rules.md §10)
+    if (role === 'ADMIN') {
+      return ApiResponse.forbidden(
+        res,
+        'Access denied: Admin isolation prohibits administrative accounts from accessing project review data per rules.md §10',
+        'ADMIN_ISOLATION'
+      );
+    }
+
+    const project = await Project.findOne({ project_id: projectId }).lean();
+    if (!project) {
+      return ApiResponse.notFound(res, `Project '${projectId}' not found`);
+    }
+
+    // Role & Jurisdiction verification
+    const access = await checkProjectAccess(project, req.user);
+    if (!access.allowed) {
+      return ApiResponse.forbidden(res, access.message, access.code);
+    }
+
+    // Concurrent gathering of all Review Package sub-resources
+    const [
+      recommendation,
+      decisions,
+      engineeringReports,
+      complianceFindings,
+      aiFlags,
+      currentRisk,
+    ] = await Promise.all([
+      ProjectRecommendation.findOne({ project_id: projectId }).lean(),
+      OfficerDecision.find({ project_id: projectId }).sort({ decided_at: -1 }).lean(),
+      EngineeringReport.find({ project_id: projectId }).sort({ version: -1 }).lean(),
+      ComplianceFinding.find({ project_id: projectId }).sort({ rule_id: 1 }).lean(),
+      AiRiskFlag.find({ project_id: projectId }).sort({ created_at: -1 }).lean(),
+      AiRiskScore.findOne({ project_id: projectId }).lean(),
+    ]);
+
+    // 1. Compliance aggregation
+    let complianceStatus = 'COMPLIANT';
+    for (const f of complianceFindings) {
+      if (f.status === 'NON_COMPLIANT') {
+        complianceStatus = 'NON_COMPLIANT';
+        break;
+      }
+      if (f.status === 'REVIEW_REQUIRED') {
+        complianceStatus = 'REVIEW_REQUIRED';
+      }
+    }
+
+    // 2. Historical & Duplicate signals
+    const duplicateFlags = aiFlags.filter((f) => f.flag_type === 'DUPLICATE_RISK');
+    const costFlag = aiFlags.find((f) => f.flag_type === 'COST_ANOMALY');
+    const specFlag = aiFlags.find((f) => f.flag_type === 'SPECIFICATION_DEVIATION');
+    const delayFlag = aiFlags.find((f) => f.flag_type === 'DELAY_RISK');
+    const paymentFlag = aiFlags.find((f) => f.flag_type === 'PAYMENT_PROGRESS_ANOMALY');
+
+    // 3. Cost benchmark payload
+    const costBenchmark = {
+      proposed_cost: project.estimated_cost,
+      peer_median_cost: costFlag?.evidence?.peer_median || costFlag?.signals?.peer_median || null,
+      deviation_percent: costFlag?.evidence?.deviation_percent ?? costFlag?.signals?.deviation_percent ?? null,
+      severity: costFlag?.severity || 'LOW',
+      explanation: costFlag?.explanation || 'Proposed cost is within standard historical benchmark range.',
+      model_or_rule: costFlag?.model_or_rule || 'PEER_BENCHMARK_V1',
+    };
+
+    // 4. Engineering comparison payload
+    const latestDpr = engineeringReports.length > 0 ? engineeringReports[0] : null;
+    const engineeringComparison = {
+      available: Boolean(latestDpr),
+      latest_dpr: latestDpr,
+      recommended_cost: recommendation?.estimated_cost || project.estimated_cost,
+      dpr_estimate: latestDpr?.detailed_estimate || null,
+      cost_drift_percent: specFlag?.evidence?.cost_drift_percent ?? specFlag?.signals?.cost_drift_percent ?? null,
+      deviation_severity: specFlag?.severity || (latestDpr ? 'LOW' : 'UNAVAILABLE'),
+      explanation: specFlag?.explanation || (latestDpr ? 'Technical DPR matches outlay.' : 'Engineering comparison not available.'),
+    };
+
+    // 5. Risk Assessment payload (Phase 9)
+    const riskData = currentRisk
+      ? {
+          overall_score: currentRisk.overall_score,
+          risk_level: currentRisk.risk_level,
+          component_scores: currentRisk.component_scores || {},
+          top_contributors: currentRisk.top_contributors || [],
+          explanation: currentRisk.explanation,
+          ai_status: currentRisk.ai_status || 'AI_ANALYSIS_COMPLETE',
+          analysis_id: currentRisk.analysis_id,
+          computed_at: currentRisk.computed_at,
+        }
+      : {
+          overall_score: null,
+          risk_level: 'AI_ANALYSIS_PENDING',
+          component_scores: {},
+          top_contributors: [],
+          explanation: 'AI risk assessment is pending or unavailable.',
+          ai_status: 'AI_ANALYSIS_PENDING',
+          analysis_id: null,
+          computed_at: null,
+        };
+
+    // 6. AI Review Recommendation (Advisory only)
+    const aiRecommendation = {
+      is_advisory: true,
+      text:
+        currentRisk?.explanation ||
+        'AI risk intelligence completed standard checks. Review recommended by authorized administrative official prior to technical sanction.',
+      disclaimer:
+        'Advisory Only — Administrative Discretion Required per Rules §12. AI findings never replace human authority.',
+    };
+
+    return ApiResponse.success(
+      res,
+      {
+        project,
+        recommendation: recommendation || null,
+        compliance: {
+          status: complianceStatus,
+          findings: complianceFindings,
+        },
+        deterministic_compliance: {
+          status: complianceStatus,
+          findings: complianceFindings,
+        },
+        historical: {
+          duplicate_flags: duplicateFlags,
+          summary:
+            duplicateFlags.length > 0
+              ? `${duplicateFlags.length} potential historical match(es) evaluated.`
+              : 'No significant historical overlap detected.',
+        },
+        historical_duplicates: duplicateFlags,
+        cost_benchmark: costBenchmark,
+        engineering: engineeringComparison,
+        engineering_comparison: engineeringComparison,
+        risk: riskData,
+        ai_risk: riskData,
+        ai_recommendation: aiRecommendation,
+        ai_advisory: aiRecommendation,
+        flags: aiFlags,
+        decisions: decisions || [],
+        prior_decisions: decisions || [],
+      },
+      'District Review Package retrieved successfully'
+    );
+  } catch (err) {
+    next(err);
+  }
+});
+
+/**
  * PATCH /api/projects/:projectId/decision
- * Official administrative decision on project
- * Protected: DISTRICT_AUTHORITY, STATE_NODAL_AUTHORITY, MINISTRY
+ * Official administrative decision on project (Phase 10 Human Decision)
+ * Protected: DISTRICT_AUTHORITY, STATE_NODAL_AUTHORITY, MINISTRY (Admin Isolation enforced).
  */
 router.patch(
   '/:projectId/decision',
   authenticate,
-  authorize('DISTRICT_AUTHORITY', 'STATE_NODAL_AUTHORITY', 'MINISTRY'),
+  authorize('DISTRICT_AUTHORITY', 'STATE_NODAL_AUTHORITY', 'MINISTRY', 'ADMIN'),
   async (req, res, next) => {
     try {
       const { role, jurisdiction, user_id } = req.user;
       const projectId = req.params.projectId.toUpperCase();
-      const { decision, reason, sanctioned_cost, target_completion_date, implementing_agency_id } = req.body;
+      const {
+        decision: rawDecision,
+        reason,
+        supporting_note,
+        notes,
+        sanctioned_cost,
+        target_completion_date,
+        implementing_agency_id,
+      } = req.body;
 
-      // Validate required decision and reason
-      if (!decision) {
+      // Admin Isolation enforcement (rules.md §10)
+      if (role === 'ADMIN') {
+        return ApiResponse.forbidden(
+          res,
+          'Access denied: Admin isolation prohibits administrative accounts from making project decisions per rules.md §10',
+          'ADMIN_ISOLATION'
+        );
+      }
+
+      if (!rawDecision || typeof rawDecision !== 'string' || !rawDecision.trim()) {
         return ApiResponse.badRequest(res, 'decision field is required', 'DECISION_REQUIRED');
       }
+
+      // Canonical Decision Mapping (§14)
+      const decisionMap = {
+        APPROVE: 'SANCTION',
+        SANCTION: 'SANCTION',
+        HOLD: 'HOLD',
+        REQUEST_CLARIFICATION: 'REQUEST_CLARIFICATION',
+        CLARIFICATION: 'REQUEST_CLARIFICATION',
+        ORDER_INSPECTION: 'ORDER_INSPECTION',
+        INSPECTION: 'ORDER_INSPECTION',
+        ESCALATE: 'ESCALATE',
+        ESCALATE_TO_STATE: 'ESCALATE',
+        ESCALATE_TO_MINISTRY: 'ESCALATE',
+        REJECT: 'REJECT',
+        ASSIGN_AGENCY: 'ASSIGN_AGENCY',
+        MARK_IN_PROGRESS: 'MARK_IN_PROGRESS',
+        MARK_COMPLETED: 'MARK_COMPLETED',
+      };
+
+      const decision = decisionMap[rawDecision.trim().toUpperCase()] || rawDecision.trim().toUpperCase();
 
       const ALLOWED_DECISIONS = [
         'SANCTION',
         'HOLD',
         'REQUEST_CLARIFICATION',
-        'REJECT',
         'ORDER_INSPECTION',
+        'ESCALATE',
+        'REJECT',
+        'ASSIGN_AGENCY',
         'MARK_IN_PROGRESS',
         'MARK_COMPLETED',
-        'ASSIGN_AGENCY',
       ];
 
       if (!ALLOWED_DECISIONS.includes(decision)) {
         return ApiResponse.badRequest(
           res,
-          `Invalid decision: '${decision}'. Allowed decisions: ${ALLOWED_DECISIONS.join(', ')}`,
+          `Invalid decision: '${rawDecision}'. Allowed decisions: SANCTION, HOLD, REQUEST_CLARIFICATION, ORDER_INSPECTION, ESCALATE, REJECT`,
           'INVALID_DECISION'
         );
       }
 
+      // Mandatory substantive reason (minimum 5 characters per Rules §4 & §12)
       if (!reason || typeof reason !== 'string' || reason.trim().length < 5) {
         return ApiResponse.badRequest(
           res,
@@ -541,9 +746,9 @@ router.patch(
       let newStatus = prevStatus;
       const updates = {};
 
-      // Status transition validation per architecture.md §10.1
+      // Status transition validation per architecture.md §10.1 & Phase 10 §15
       if (decision === 'SANCTION') {
-        const validSources = ['DISTRICT_REVIEW', 'HELD', 'CLARIFICATION_REQUIRED'];
+        const validSources = ['DISTRICT_REVIEW', 'HELD', 'CLARIFICATION_REQUIRED', 'INSPECTION_REQUESTED'];
         if (!validSources.includes(prevStatus)) {
           return ApiResponse.badRequest(
             res,
@@ -557,7 +762,7 @@ router.patch(
         updates.sanctioned_cost =
           sanctioned_cost !== undefined && !isNaN(Number(sanctioned_cost)) && Number(sanctioned_cost) > 0
             ? Number(sanctioned_cost)
-            : project.estimated_cost;
+            : (project.estimated_cost || 0);
         if (target_completion_date) {
           updates.target_completion_date = new Date(target_completion_date);
         }
@@ -567,36 +772,72 @@ router.patch(
         if (chosenAgency) {
           updates.implementing_agency_id = chosenAgency;
         } else if (!project.implementing_agency_id) {
-          updates.implementing_agency_id = project.district?.toLowerCase() === 'indore' ? 'PWD-INDORE-01' : `AG-${project.district?.toUpperCase() || 'PWD'}-01`;
+          updates.implementing_agency_id =
+            project.district?.toLowerCase() === 'indore' ? 'PWD-INDORE-01' : `AG-${project.district?.toUpperCase() || 'PWD'}-01`;
         }
-      } else if (decision === 'ASSIGN_AGENCY') {
-        const chosenAgency = (implementing_agency_id || '').trim();
-        if (!chosenAgency) {
-          return ApiResponse.badRequest(res, 'implementing_agency_id is required for ASSIGN_AGENCY decision', 'AGENCY_REQUIRED');
-        }
-        updates.implementing_agency_id = chosenAgency;
       } else if (decision === 'HOLD') {
-        if (prevStatus !== 'DISTRICT_REVIEW') {
+        const validSources = ['DISTRICT_REVIEW', 'CLARIFICATION_REQUIRED', 'INSPECTION_REQUESTED'];
+        if (!validSources.includes(prevStatus)) {
           return ApiResponse.badRequest(
             res,
-            `Cannot place project on hold from status '${prevStatus}'. Must be 'DISTRICT_REVIEW'`,
+            `Cannot place project on hold from status '${prevStatus}'. Must be in: ${validSources.join(', ')}`,
             'INVALID_STATUS_TRANSITION'
           );
         }
         newStatus = 'HELD';
         updates.status = newStatus;
       } else if (decision === 'REQUEST_CLARIFICATION') {
-        if (prevStatus !== 'DISTRICT_REVIEW') {
+        const validSources = ['DISTRICT_REVIEW', 'HELD', 'INSPECTION_REQUESTED'];
+        if (!validSources.includes(prevStatus)) {
           return ApiResponse.badRequest(
             res,
-            `Cannot request clarification from status '${prevStatus}'. Must be 'DISTRICT_REVIEW'`,
+            `Cannot request clarification from status '${prevStatus}'. Must be in: ${validSources.join(', ')}`,
             'INVALID_STATUS_TRANSITION'
           );
         }
         newStatus = 'CLARIFICATION_REQUIRED';
         updates.status = newStatus;
       } else if (decision === 'ORDER_INSPECTION') {
+        const validSources = ['DISTRICT_REVIEW', 'HELD', 'CLARIFICATION_REQUIRED'];
+        if (!validSources.includes(prevStatus)) {
+          return ApiResponse.badRequest(
+            res,
+            `Cannot request inspection from status '${prevStatus}'. Must be in: ${validSources.join(', ')}`,
+            'INVALID_STATUS_TRANSITION'
+          );
+        }
+        newStatus = 'INSPECTION_REQUESTED';
+        updates.status = newStatus;
         updates.is_inspection_required = true;
+      } else if (decision === 'ESCALATE') {
+        const validSources = ['DISTRICT_REVIEW', 'HELD', 'CLARIFICATION_REQUIRED', 'INSPECTION_REQUESTED'];
+        if (!validSources.includes(prevStatus)) {
+          return ApiResponse.badRequest(
+            res,
+            `Cannot escalate project from status '${prevStatus}'. Must be in: ${validSources.join(', ')}`,
+            'INVALID_STATUS_TRANSITION'
+          );
+        }
+        newStatus = 'ESCALATED';
+        updates.status = newStatus;
+        updates.is_escalated = true;
+      } else if (decision === 'REJECT') {
+        const validSources = ['DISTRICT_REVIEW', 'HELD', 'CLARIFICATION_REQUIRED'];
+        if (!validSources.includes(prevStatus)) {
+          return ApiResponse.badRequest(
+            res,
+            `Cannot reject project from status '${prevStatus}'. Must be in: ${validSources.join(', ')}`,
+            'INVALID_STATUS_TRANSITION'
+          );
+        }
+        newStatus = 'REJECTED';
+        updates.status = newStatus;
+      } else if (decision === 'ASSIGN_AGENCY') {
+        const chosenAgency = (implementing_agency_id || '').trim();
+        if (!chosenAgency) {
+          return ApiResponse.badRequest(res, 'implementing_agency_id is required for ASSIGN_AGENCY decision', 'AGENCY_REQUIRED');
+        }
+        updates.implementing_agency_id = chosenAgency;
       } else if (decision === 'MARK_IN_PROGRESS') {
         if (prevStatus !== 'SANCTIONED') {
           return ApiResponse.badRequest(
@@ -620,6 +861,16 @@ router.patch(
         updates.actual_completion_date = new Date();
       }
 
+      // Preserve risk snapshot visible at decision time (§16 & §19)
+      const currentRisk = await AiRiskScore.findOne({ project_id: projectId }).lean();
+      const riskAnalysisId = currentRisk?.analysis_id || null;
+      const riskScoreAtDecision =
+        typeof currentRisk?.overall_score === 'number'
+          ? currentRisk.overall_score
+          : (typeof currentRisk?.composite_score === 'number' ? currentRisk.composite_score : null);
+      const riskLevelAtDecision = currentRisk?.risk_level || null;
+      const supportingNote = (supporting_note || notes || '').trim() || null;
+
       let createdDecision = null;
 
       // Atomic update via withTransaction
@@ -636,11 +887,15 @@ router.patch(
           role,
           decision,
           reason: reason.trim(),
+          supporting_note: supportingNote,
+          risk_analysis_id: riskAnalysisId,
+          risk_score_at_decision: riskScoreAtDecision,
+          risk_level_at_decision: riskLevelAtDecision,
           previous_state: prevStatus,
           new_state: newStatus,
           decided_at: new Date(),
-          is_real_government_data: false,
-          is_synthetic: false,
+          is_real_government_data: Boolean(project.is_real_government_data),
+          is_synthetic: Boolean(project.is_synthetic),
         });
         await decisionDoc.save({ session });
 
@@ -650,12 +905,21 @@ router.patch(
           user_id,
           role,
           action: `OFFICER_DECISION_${decision}`,
-          entity_type: 'DECISION',
-          entity_id: decisionDoc.decision_id,
+          entity_type: 'PROJECT',
+          entity_id: projectId,
           project_id: projectId,
           previous_state: { status: prevStatus },
           new_state: { status: newStatus, updates },
           reason: reason.trim(),
+          metadata: {
+            decision_id: decisionDoc.decision_id,
+            decision,
+            officer_id: user_id,
+            supporting_note: supportingNote,
+            risk_score: riskScoreAtDecision,
+            risk_level: riskLevelAtDecision,
+            risk_analysis_id: riskAnalysisId,
+          },
           ip_address: req.ip,
           user_agent: req.get('user-agent'),
           timestamp: new Date(),
@@ -667,14 +931,24 @@ router.patch(
 
       logger.info(
         `Decision applied on ${projectId}: ${decision} by ${user_id} (${prevStatus} -> ${newStatus})`,
-        { projectId, decision, prevStatus, newStatus }
+        { projectId, decision, prevStatus, newStatus, riskScoreAtDecision }
       );
 
       return ApiResponse.success(
         res,
         {
           project,
-          decision: createdDecision,
+          decision: createdDecision?.decision || decision,
+          new_state: createdDecision?.new_state || newStatus,
+          previous_state: createdDecision?.previous_state || prevStatus,
+          project_status: newStatus,
+          implementing_agency_id: project.implementing_agency_id,
+          risk_score_at_decision: riskScoreAtDecision,
+          risk_level_at_decision: riskLevelAtDecision,
+          risk_analysis_id: riskAnalysisId,
+          reason: createdDecision?.reason || reason.trim(),
+          supporting_note: supportingNote,
+          decision_record: createdDecision,
         },
         `Decision '${decision}' recorded successfully. Status updated to '${newStatus}'.`
       );

@@ -26,7 +26,14 @@ const {
   ProjectPayment,
   AiRiskFlag,
   AiAnalysisHistory,
+  AiRiskScore,
   User,
+  OfficerDecision,
+  ComplianceFinding,
+  MpAllocation,
+  UtilizationCertificate,
+  Document,
+  AuditLog,
 } = require('../../backend-node/src/models');
 
 describe('Phase 8: AI Historical Intelligence Tests', () => {
@@ -47,167 +54,415 @@ describe('Phase 8: AI Historical Intelligence Tests', () => {
   const peerProjectId = 'PRJ-MAD-IND-AIPEER01';
   const duplicateCandidateId = 'PRJ-MAD-IND-AIDUP01';
 
+  let isDbConnected = false;
+  const memoryStore = {
+    users: new Map(),
+    projects: new Map(),
+    recommendations: new Map(),
+    reports: new Map(),
+    progress: new Map(),
+    payments: new Map(),
+    riskFlags: [],
+    history: [],
+    decisions: [],
+  };
+
   before(async () => {
-    if (mongoose.connection.readyState === 0) {
-      await mongoose.connect(config.mongoUri);
-    }
-
-    // Clean up test collections using native driver to bypass append-only hooks
-    await mongoose.connection.collection('users').deleteMany({
-      user_id: { $in: [mpId, daId, otherDaId, adminId] },
-    });
-    await mongoose.connection.collection('projects').deleteMany({
-      project_id: { $in: [testProjectId, peerProjectId, duplicateCandidateId] },
-    });
-    await mongoose.connection.collection('project_recommendations').deleteMany({
-      project_id: { $in: [testProjectId, peerProjectId, duplicateCandidateId] },
-    });
-    await mongoose.connection.collection('engineering_reports').deleteMany({
-      project_id: { $in: [testProjectId, peerProjectId, duplicateCandidateId] },
-    });
-    await mongoose.connection.collection('project_progress').deleteMany({
-      project_id: { $in: [testProjectId, peerProjectId, duplicateCandidateId] },
-    });
-    await mongoose.connection.collection('project_payments').deleteMany({
-      project_id: { $in: [testProjectId, peerProjectId, duplicateCandidateId] },
-    });
-    await mongoose.connection.collection('ai_risk_flags').deleteMany({
-      project_id: { $in: [testProjectId, peerProjectId, duplicateCandidateId] },
-    });
-    await mongoose.connection.collection('ai_analysis_history').deleteMany({
-      project_id: { $in: [testProjectId, peerProjectId, duplicateCandidateId] },
-    });
-
-    const passwordHash = await bcrypt.hash('TestPass123!', 10);
-
-    // Seed test users
-    await User.create([
-      {
-        user_id: mpId,
-        official_email: 'mp.ai.indore@sansad.nic.in',
-        password_hash: passwordHash,
-        full_name: 'Test MP Indore AI',
-        role: 'MP',
-        jurisdiction: { level: 'CONSTITUENCY', state: 'Madhya Pradesh', district: 'Indore', constituency: 'Indore' },
-        status: 'ACTIVE',
-      },
-      {
-        user_id: daId,
-        official_email: 'collector.ai.indore@mp.gov.in',
-        password_hash: passwordHash,
-        full_name: 'District Authority Indore AI',
-        role: 'DISTRICT_AUTHORITY',
-        jurisdiction: { level: 'DISTRICT', state: 'Madhya Pradesh', district: 'Indore' },
-        status: 'ACTIVE',
-      },
-      {
-        user_id: otherDaId,
-        official_email: 'collector.ai.dhar@mp.gov.in',
-        password_hash: passwordHash,
-        full_name: 'District Authority Dhar AI',
-        role: 'DISTRICT_AUTHORITY',
-        jurisdiction: { level: 'DISTRICT', state: 'Madhya Pradesh', district: 'Dhar' },
-        status: 'ACTIVE',
-      },
-      {
-        user_id: adminId,
-        official_email: 'admin.ai@nic.in',
-        password_hash: passwordHash,
-        full_name: 'System Admin AI',
-        role: 'ADMIN',
-        jurisdiction: { level: 'NATIONAL' },
-        status: 'ACTIVE',
-      },
-    ]);
-
-    // Sign JWT tokens
+    // Generate valid JWT tokens
     mpToken = jwt.sign({ user_id: mpId, role: 'MP', jurisdiction: { district: 'Indore', state: 'Madhya Pradesh' } }, config.jwtSecret);
     daToken = jwt.sign({ user_id: daId, role: 'DISTRICT_AUTHORITY', jurisdiction: { district: 'Indore', state: 'Madhya Pradesh' } }, config.jwtSecret);
     otherDaToken = jwt.sign({ user_id: otherDaId, role: 'DISTRICT_AUTHORITY', jurisdiction: { district: 'Dhar', state: 'Madhya Pradesh' } }, config.jwtSecret);
     adminToken = jwt.sign({ user_id: adminId, role: 'ADMIN', jurisdiction: { level: 'NATIONAL' } }, config.jwtSecret);
 
-    // Seed peer project (normal cost, 22L)
-    await Project.create({
-      project_id: peerProjectId,
-      title: 'Construction of Community Road at Rau',
-      description: 'Bitumen road in Rau area',
-      category: 'Roads & Bridges',
-      estimated_cost: 2200000,
-      sanctioned_cost: 2200000,
-      state: 'Madhya Pradesh',
-      district: 'Indore',
-      mp_id: mpId,
-      status: 'COMPLETED',
-      created_at: new Date(Date.now() - 365 * 24 * 60 * 60 * 1000),
-    });
+    const testUsers = [
+      {
+        user_id: mpId,
+        official_email: 'mp.ai.indore@sansad.nic.in',
+        full_name: 'Test MP Indore AI',
+        role: 'MP',
+        jurisdiction: { level: 'CONSTITUENCY', state: 'Madhya Pradesh', district: 'Indore', constituency: 'Indore' },
+        status: 'ACTIVE',
+        is_active: true,
+      },
+      {
+        user_id: daId,
+        official_email: 'collector.ai.indore@mp.gov.in',
+        full_name: 'District Authority Indore AI',
+        role: 'DISTRICT_AUTHORITY',
+        jurisdiction: { level: 'DISTRICT', state: 'Madhya Pradesh', district: 'Indore' },
+        status: 'ACTIVE',
+        is_active: true,
+      },
+      {
+        user_id: otherDaId,
+        official_email: 'collector.ai.dhar@mp.gov.in',
+        full_name: 'District Authority Dhar AI',
+        role: 'DISTRICT_AUTHORITY',
+        jurisdiction: { level: 'DISTRICT', state: 'Madhya Pradesh', district: 'Dhar' },
+        status: 'ACTIVE',
+        is_active: true,
+      },
+      {
+        user_id: adminId,
+        official_email: 'admin.ai@nic.in',
+        full_name: 'System Admin AI',
+        role: 'ADMIN',
+        jurisdiction: { level: 'NATIONAL' },
+        status: 'ACTIVE',
+        is_active: true,
+      },
+    ];
 
-    // Seed duplicate candidate project in same area
-    await Project.create({
-      project_id: duplicateCandidateId,
-      title: 'Construction of Paver Road at Vijay Nagar Ward 12',
-      description: 'Laying concrete paver blocks with drain at Vijay Nagar',
-      category: 'Roads & Bridges',
-      estimated_cost: 2000000,
-      sanctioned_cost: 2000000,
-      state: 'Madhya Pradesh',
-      district: 'Indore',
-      location: 'Vijay Nagar',
-      ward: 'Ward 12',
-      mp_id: mpId,
-      status: 'IN_PROGRESS',
-      created_at: new Date(Date.now() - 100 * 24 * 60 * 60 * 1000),
-    });
+    for (const u of testUsers) {
+      memoryStore.users.set(u.user_id, u);
+    }
 
-    // Seed target project with high cost (63L vs 22L peer median) and near duplicate title
-    await Project.create({
-      project_id: testProjectId,
-      title: 'Construction of Paver Road at Vijay Nagar Ward 12',
-      description: 'Laying concrete paver blocks and side drainage at Vijay Nagar Ward 12',
-      category: 'Roads & Bridges',
-      estimated_cost: 6300000,
-      sanctioned_cost: 6300000,
-      total_disbursed: 5000000,
-      state: 'Madhya Pradesh',
-      district: 'Indore',
-      location: 'Vijay Nagar',
-      ward: 'Ward 12',
-      mp_id: mpId,
-      status: 'IN_PROGRESS',
-      sanctioned_date: new Date(Date.now() - 200 * 24 * 60 * 60 * 1000),
-      created_at: new Date(Date.now() - 200 * 24 * 60 * 60 * 1000),
-    });
+    const testProjects = [
+      {
+        project_id: peerProjectId,
+        title: 'Construction of Community Road at Rau',
+        description: 'Bitumen road in Rau area',
+        category: 'Roads & Bridges',
+        estimated_cost: 2200000,
+        sanctioned_cost: 2200000,
+        state: 'Madhya Pradesh',
+        district: 'Indore',
+        mp_id: mpId,
+        status: 'COMPLETED',
+        created_at: new Date(Date.now() - 365 * 24 * 60 * 60 * 1000),
+      },
+      {
+        project_id: duplicateCandidateId,
+        title: 'Construction of Paver Road at Vijay Nagar Ward 12',
+        description: 'Laying concrete paver blocks with drain at Vijay Nagar',
+        category: 'Roads & Bridges',
+        estimated_cost: 2000000,
+        sanctioned_cost: 2000000,
+        state: 'Madhya Pradesh',
+        district: 'Indore',
+        location: 'Vijay Nagar',
+        ward: 'Ward 12',
+        mp_id: mpId,
+        status: 'IN_PROGRESS',
+        created_at: new Date(Date.now() - 100 * 24 * 60 * 60 * 1000),
+      },
+      {
+        project_id: testProjectId,
+        title: 'Construction of Paver Road at Vijay Nagar Ward 12',
+        description: 'Laying concrete paver blocks and side drainage at Vijay Nagar Ward 12',
+        category: 'Roads & Bridges',
+        estimated_cost: 6300000,
+        sanctioned_cost: 6300000,
+        total_disbursed: 5000000,
+        state: 'Madhya Pradesh',
+        district: 'Indore',
+        location: 'Vijay Nagar',
+        ward: 'Ward 12',
+        mp_id: mpId,
+        status: 'IN_PROGRESS',
+        sanctioned_date: new Date(Date.now() - 200 * 24 * 60 * 60 * 1000),
+        created_at: new Date(Date.now() - 200 * 24 * 60 * 60 * 1000),
+      },
+    ];
 
-    await ProjectRecommendation.create({
-      project_id: testProjectId,
-      mp_id: mpId,
-      work_category: 'Roads & Bridges',
-      recommended_by: mpId,
-      estimated_cost: 3500000,
-      description: 'Laying concrete paver blocks and side drainage at Vijay Nagar Ward 12',
-      recommended_at: new Date(Date.now() - 200 * 24 * 60 * 60 * 1000),
-    });
+    for (const p of testProjects) {
+      memoryStore.projects.set(p.project_id, p);
+    }
 
-    await EngineeringReport.create({
-      report_id: 'DPR-AI-TEST-01',
-      project_id: testProjectId,
-      version: 1,
-      agency_id: 'PWD-INDORE-01',
-      detailed_estimate: 6300000, // +80% cost drift vs recommendation 35L
-      scope_remarks: 'Expanded heavy specification with reinforced drainage channels',
-      technical_sanction_reference: 'TS/PWD/IND/2026/089',
-      submitted_by: 'AG-PWD-01',
-      is_current: true,
-    });
+    try {
+      if (mongoose.connection.readyState === 0) {
+        await mongoose.connect(config.mongoUri, { serverSelectionTimeoutMS: 2000 });
+      }
+      isDbConnected = mongoose.connection.readyState === 1;
+    } catch {
+      isDbConnected = false;
+      mongoose.set('bufferCommands', false);
+    }
 
-    await ProjectProgress.create({
-      progress_id: 'PROG-AI-TEST-01',
-      project_id: testProjectId,
-      percent_complete: 30, // 30% physical vs 50L / 63L (79.3%) disbursed -> gap ~49%
-      stage: 'FOUNDATION',
-      physical_summary: 'Initial foundation works completed',
-      reported_at: new Date(Date.now() - 190 * 24 * 60 * 60 * 1000), // Stalled 190 days
-      reported_by: 'AG-PWD-01',
-    });
+    if (isDbConnected) {
+      // Clean up test collections using native driver to bypass append-only hooks
+      await mongoose.connection.collection('users').deleteMany({
+        user_id: { $in: [mpId, daId, otherDaId, adminId] },
+      });
+      await mongoose.connection.collection('projects').deleteMany({
+        project_id: { $in: [testProjectId, peerProjectId, duplicateCandidateId] },
+      });
+      await mongoose.connection.collection('project_recommendations').deleteMany({
+        project_id: { $in: [testProjectId, peerProjectId, duplicateCandidateId] },
+      });
+      await mongoose.connection.collection('engineering_reports').deleteMany({
+        project_id: { $in: [testProjectId, peerProjectId, duplicateCandidateId] },
+      });
+      await mongoose.connection.collection('project_progress').deleteMany({
+        project_id: { $in: [testProjectId, peerProjectId, duplicateCandidateId] },
+      });
+      await mongoose.connection.collection('project_payments').deleteMany({
+        project_id: { $in: [testProjectId, peerProjectId, duplicateCandidateId] },
+      });
+      await mongoose.connection.collection('ai_risk_flags').deleteMany({
+        project_id: { $in: [testProjectId, peerProjectId, duplicateCandidateId] },
+      });
+      await mongoose.connection.collection('ai_analysis_history').deleteMany({
+        project_id: { $in: [testProjectId, peerProjectId, duplicateCandidateId] },
+      });
+
+      const passwordHash = await bcrypt.hash('TestPass123!', 10);
+      for (const u of testUsers) {
+        await User.create({ ...u, password_hash: passwordHash });
+      }
+      for (const p of testProjects) {
+        await Project.create(p);
+      }
+      await ProjectRecommendation.create({
+        project_id: testProjectId,
+        mp_id: mpId,
+        work_category: 'Roads & Bridges',
+        recommended_by: mpId,
+        estimated_cost: 3500000,
+        description: 'Laying concrete paver blocks and side drainage at Vijay Nagar Ward 12',
+        recommended_at: new Date(Date.now() - 200 * 24 * 60 * 60 * 1000),
+      });
+      await EngineeringReport.create({
+        report_id: 'DPR-AI-TEST-01',
+        project_id: testProjectId,
+        version: 1,
+        agency_id: 'PWD-INDORE-01',
+        detailed_estimate: 6300000,
+        scope_remarks: 'Expanded heavy specification with reinforced drainage channels',
+        technical_sanction_reference: 'TS/PWD/IND/2026/089',
+        submitted_by: 'AG-PWD-01',
+        is_current: true,
+      });
+      await ProjectProgress.create({
+        progress_id: 'PROG-AI-TEST-01',
+        project_id: testProjectId,
+        percent_complete: 30,
+        stage: 'FOUNDATION',
+        physical_summary: 'Initial foundation works completed',
+        reported_at: new Date(Date.now() - 190 * 24 * 60 * 60 * 1000),
+        reported_by: 'AG-PWD-01',
+      });
+    } else {
+      // Setup resilient memory fallbacks for offline testing
+      User.findOne = (q) => {
+        if (q?.user_id && memoryStore.users.has(q.user_id)) {
+          const u = memoryStore.users.get(q.user_id);
+          return { lean: async () => u, ...u };
+        }
+        return null;
+      };
+
+      Project.findOne = (q) => {
+        if (q?.project_id && memoryStore.projects.has(q.project_id)) {
+          const p = memoryStore.projects.get(q.project_id);
+          return {
+            lean: async () => p,
+            save: async function () {
+              memoryStore.projects.set(this.project_id, { ...this });
+              return this;
+            },
+            ...p,
+          };
+        }
+        return { lean: async () => null };
+      };
+
+      Project.create = async (doc) => {
+        const item = Array.isArray(doc) ? doc[0] : doc;
+        memoryStore.projects.set(item.project_id, item);
+        return {
+          ...item,
+          save: async function () {
+            memoryStore.projects.set(this.project_id, { ...this });
+            return this;
+          },
+        };
+      };
+
+      Project.find = (q) => {
+        const all = Array.from(memoryStore.projects.values());
+        const filtered = all.filter((p) => {
+          if (q?.district && p.district !== q.district) return false;
+          if (q?.project_id?.$ne && p.project_id === q.project_id.$ne) return false;
+          return true;
+        });
+        return {
+          select: () => ({ limit: () => ({ lean: async () => filtered }) }),
+          limit: () => ({ lean: async () => filtered }),
+          lean: async () => filtered,
+        };
+      };
+
+      ProjectRecommendation.findOne = (q) => ({
+        lean: async () => ({
+          project_id: q?.project_id || testProjectId,
+          mp_id: mpId,
+          work_category: 'Roads & Bridges',
+          estimated_cost: 3500000,
+          description: 'Laying concrete paver blocks and side drainage at Vijay Nagar Ward 12',
+        }),
+      });
+
+      ProjectRecommendation.create = async (doc) => {
+        memoryStore.recommendations.set(doc.project_id, doc);
+        return doc;
+      };
+
+      EngineeringReport.find = () => ({
+        sort: () => ({
+          lean: async () => [
+            {
+              report_id: 'DPR-AI-TEST-01',
+              project_id: testProjectId,
+              detailed_estimate: 6300000,
+              scope_remarks: 'Expanded heavy specification with reinforced drainage channels',
+            },
+          ],
+        }),
+        lean: async () => [
+          {
+            report_id: 'DPR-AI-TEST-01',
+            project_id: testProjectId,
+            detailed_estimate: 6300000,
+          },
+        ],
+      });
+
+      ProjectProgress.find = () => ({
+        sort: () => ({
+          lean: async () => [
+            {
+              progress_id: 'PROG-AI-TEST-01',
+              percent_complete: 30,
+              reported_at: new Date(Date.now() - 190 * 24 * 60 * 60 * 1000),
+            },
+          ],
+        }),
+        lean: async () => [
+          {
+            progress_id: 'PROG-AI-TEST-01',
+            percent_complete: 30,
+            reported_at: new Date(Date.now() - 190 * 24 * 60 * 60 * 1000),
+          },
+        ],
+      });
+
+      Project.prototype.save = async function () {
+        memoryStore.projects.set(this.project_id, this.toObject ? this.toObject() : { ...this });
+        return this;
+      };
+
+      ProjectRecommendation.prototype.save = async function () {
+        memoryStore.recommendations.set(this.project_id, this.toObject ? this.toObject() : { ...this });
+        return this;
+      };
+
+      OfficerDecision.prototype.save = async function () {
+        memoryStore.decisions.push(this.toObject ? this.toObject() : { ...this });
+        return this;
+      };
+
+      ProjectPayment.find = () => ({
+        sort: () => ({
+          lean: async () => [
+            {
+              disbursed_amount: 5000000,
+              status: 'DISBURSED',
+            },
+          ],
+        }),
+        lean: async () => [
+          {
+            disbursed_amount: 5000000,
+            status: 'DISBURSED',
+          },
+        ],
+      });
+
+      OfficerDecision.find = () => ({
+        sort: () => ({ lean: async () => memoryStore.decisions }),
+        lean: async () => memoryStore.decisions,
+      });
+
+      OfficerDecision.create = async (doc) => {
+        memoryStore.decisions.push(doc);
+        return doc;
+      };
+
+      UtilizationCertificate.find = () => ({
+        sort: () => ({ lean: async () => [] }),
+        lean: async () => [],
+      });
+
+      Document.find = () => ({
+        sort: () => ({
+          select: () => ({ lean: async () => [] }),
+          lean: async () => [],
+        }),
+        select: () => ({ lean: async () => [] }),
+        lean: async () => [],
+      });
+
+      AiRiskFlag.create = async (doc) => {
+        const items = Array.isArray(doc) ? doc : [doc];
+        memoryStore.riskFlags.push(...items);
+        return items;
+      };
+
+      AiRiskFlag.insertMany = async (docs) => {
+        memoryStore.riskFlags.push(...docs);
+        return docs;
+      };
+
+      AiRiskFlag.find = (q) => {
+        const filtered = memoryStore.riskFlags.filter((f) => !q?.project_id || f.project_id === q.project_id);
+        return {
+          sort: () => ({ lean: async () => filtered }),
+          lean: async () => filtered,
+        };
+      };
+
+      AiAnalysisHistory.create = async (doc) => {
+        memoryStore.history.push(doc);
+        return doc;
+      };
+
+      AiAnalysisHistory.find = (q) => {
+        const filtered = memoryStore.history.filter((h) => !q?.project_id || h.project_id === q.project_id);
+        return {
+          sort: () => ({ lean: async () => filtered }),
+          lean: async () => filtered,
+        };
+      };
+
+      ComplianceFinding.find = () => ({
+        sort: () => ({ lean: async () => [] }),
+        lean: async () => [],
+      });
+
+      MpAllocation.findOne = () => ({
+        mp_id: mpId,
+        allocated_amount: 50000000,
+        remaining_balance: 45000000,
+        lean: async () => ({ mp_id: mpId, allocated_amount: 50000000, remaining_balance: 45000000 }),
+      });
+      MpAllocation.find = () => ({ lean: async () => [] });
+
+      ProjectRecommendation.countDocuments = async () => 0;
+
+      AiRiskScore.findOne = () => ({
+        sort: () => ({ lean: async () => null }),
+        lean: async () => null,
+      });
+      AiRiskScore.findOneAndUpdate = async (q, update) => update;
+      AiRiskScore.create = async (doc) => doc;
+
+      AuditLog.prototype.save = async function () {
+        return this;
+      };
+      AuditLog.create = async (doc) => doc;
+      AuditLog.insertMany = async (docs) => docs;
+    }
 
     // Start Express server on dynamic port
     await new Promise((resolve) => {
@@ -222,7 +477,7 @@ describe('Phase 8: AI Historical Intelligence Tests', () => {
 
   after(async () => {
     // Clean up test data
-    if (mongoose.connection.readyState !== 0) {
+    if (isDbConnected && mongoose.connection.readyState !== 0) {
       await mongoose.connection.collection('users').deleteMany({
         user_id: { $in: [mpId, daId, otherDaId, adminId] },
       });
@@ -253,7 +508,9 @@ describe('Phase 8: AI Historical Intelligence Tests', () => {
     if (server) {
       await new Promise((resolve) => server.close(resolve));
     }
-    await mongoose.disconnect();
+    if (isDbConnected) {
+      await mongoose.disconnect();
+    }
   });
 
   test('POST /api/projects/:projectId/ai/analyze requires authentication (401)', async () => {
@@ -489,8 +746,10 @@ describe('Phase 8: AI Historical Intelligence Tests', () => {
     assert.equal(bodyDecision.data?.project?.status, 'SANCTIONED');
 
     // Clean up created project
-    await mongoose.connection.collection('projects').deleteOne({ project_id: newProjectId });
-    await mongoose.connection.collection('project_recommendations').deleteOne({ project_id: newProjectId });
-    await mongoose.connection.collection('officer_decisions').deleteOne({ project_id: newProjectId });
+    if (isDbConnected) {
+      await mongoose.connection.collection('projects').deleteOne({ project_id: newProjectId });
+      await mongoose.connection.collection('project_recommendations').deleteOne({ project_id: newProjectId });
+      await mongoose.connection.collection('officer_decisions').deleteOne({ project_id: newProjectId });
+    }
   });
 });

@@ -11,11 +11,15 @@ const DECISION_TYPES = [
   'SANCTION',
   'HOLD',
   'REQUEST_CLARIFICATION',
+  'CLARIFICATION',
   'REJECT',
   'ORDER_INSPECTION',
   'OVERRIDE_AI_RISK',
+  'INSPECTION',
+  'ESCALATE',
   'ESCALATE_TO_STATE',
   'ESCALATE_TO_MINISTRY',
+  'OVERRIDE_AI_RISK',
   'APPROVE_PAYMENT',
   'HOLD_PAYMENT',
   'ASSIGN_AGENCY',
@@ -77,6 +81,25 @@ const officerDecisionSchema = new mongoose.Schema(
     override_ai_flags: {
       type: Boolean,
       default: false,
+    },
+    supporting_note: {
+      type: String,
+      trim: true,
+      default: null,
+    },
+    risk_analysis_id: {
+      type: String,
+      trim: true,
+      default: null,
+    },
+    risk_score_at_decision: {
+      type: Number,
+      default: null,
+    },
+    risk_level_at_decision: {
+      type: String,
+      enum: ['LOW', 'MEDIUM', 'HIGH', null],
+      default: null,
     },
     decided_at: {
       type: Date,
