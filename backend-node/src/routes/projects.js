@@ -24,6 +24,7 @@ const {
   UtilizationCertificate,
   Document,
   ComplianceFinding,
+  AiRiskFlag,
   PROJECT_CATEGORIES,
   PROJECT_STATUSES,
   DECISION_TYPES,
@@ -393,6 +394,7 @@ router.get('/:projectId', authenticate, async (req, res, next) => {
       utilizationCertificates,
       documents,
       complianceFindings,
+      aiFindings,
     ] = await Promise.all([
       ProjectRecommendation.findOne({ project_id: projectId }).lean(),
       OfficerDecision.find({ project_id: projectId }).sort({ decided_at: -1 }).lean(),
@@ -402,6 +404,7 @@ router.get('/:projectId', authenticate, async (req, res, next) => {
       UtilizationCertificate.find({ project_id: projectId }).sort({ created_at: -1 }).lean(),
       Document.find({ project_id: projectId }).sort({ uploaded_at: -1 }).select('-__v').lean(),
       ComplianceFinding.find({ project_id: projectId }).sort({ rule_id: 1 }).lean(),
+      AiRiskFlag.find({ project_id: projectId }).sort({ created_at: -1 }).lean(),
     ]);
 
     // Compute overall compliance status
@@ -431,6 +434,7 @@ router.get('/:projectId', authenticate, async (req, res, next) => {
           overall_status: complianceStatus,
           findings: complianceFindings || [],
         },
+        ai_findings: aiFindings || [],
       },
       'Project details retrieved successfully'
     );
@@ -438,6 +442,9 @@ router.get('/:projectId', authenticate, async (req, res, next) => {
     next(err);
   }
 });
+
+// Mount AI historical intelligence routes (/api/projects/:projectId/ai/...)
+router.use('/:projectId/ai', require('./ai'));
 
 // Alias for explicit detail endpoint
 router.get('/:projectId/detail', authenticate, async (req, res, next) => {

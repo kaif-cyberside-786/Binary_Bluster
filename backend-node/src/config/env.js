@@ -57,6 +57,10 @@ const config = {
       : 'mplads_dev_n8n_webhook_secret_key_456'),
   internalApiBaseUrl: process.env.INTERNAL_API_BASE_URL || 'http://localhost:5000',
   n8nBaseUrl: process.env.N8N_BASE_URL || 'http://localhost:5678',
+
+  // AI Service (Phase 8)
+  aiServiceUrl: process.env.AI_SERVICE_URL || 'http://localhost:8000',
+  aiServiceTimeoutMs: parseInt(process.env.AI_SERVICE_TIMEOUT_MS, 10) || 5000,
 };
 
 module.exports = config;

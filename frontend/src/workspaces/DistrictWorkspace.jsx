@@ -6,6 +6,7 @@ import Card from '../components/Card';
 import Button from '../components/Button';
 import { StatusBadge } from '../components/Badge';
 import ProjectDetailModal from '../components/ProjectDetailModal';
+import AiHistoricalIntelligencePanel from '../components/AiHistoricalIntelligencePanel';
 
 export function DistrictWorkspace() {
   const { user, authFetch } = useAuth();
@@ -428,7 +429,7 @@ export function DistrictWorkspace() {
               borderRadius: 'var(--radius-md)',
               border: '1px solid var(--color-border)',
               width: '100%',
-              maxWidth: '650px',
+              maxWidth: '850px',
               maxHeight: '90vh',
               overflowY: 'auto',
               boxShadow: '0 10px 25px rgba(0, 0, 0, 0.2)',
@@ -503,6 +504,17 @@ export function DistrictWorkspace() {
                 <div>
                   <strong>Location:</strong> {district} District, {state}
                 </div>
+              </div>
+
+              {/* AI Historical Intelligence & Risk Signals */}
+              <div style={{ marginBottom: 'var(--space-5)' }}>
+                <AiHistoricalIntelligencePanel
+                  projectId={reviewProject.project_id}
+                  initialFlags={[]}
+                  onAnalysisCompleted={() => {
+                    fetchProjects();
+                  }}
+                />
               </div>
 
               {/* Implementing Agency Assignment */}

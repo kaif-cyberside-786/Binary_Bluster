@@ -38,6 +38,16 @@ async function startServer() {
     logger.info(`Health check available at http://localhost:${config.port}/api/health`);
   });
 
+  server.on('error', async (err) => {
+    if (err.code === 'EADDRINUSE') {
+      logger.error(`Port ${config.port} is already in use. Terminate the process using port ${config.port} or set a different PORT in .env.`);
+    } else {
+      logger.error('Server error occurred', { error: err.message });
+    }
+    await closeDB();
+    process.exit(1);
+  });
+
   // Graceful shutdown
   const shutdown = async (signal) => {
     logger.info(`Received ${signal}. Shutting down gracefully...`);

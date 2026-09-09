@@ -6,8 +6,10 @@
   "scripts": {
     "dev:backend": "npm --prefix backend-node run dev",
     "dev:frontend": "npm --prefix frontend run dev",
+    "dev:ai": "py -m uvicorn app.main:app --port 8000 --app-dir ai-service --reload",
     "build:frontend": "npm --prefix frontend run build",
     "test": "node tests/runAll.js",
+    "test:ai": "py -m unittest discover -s ai-service/tests -p \"test_*.py\"",
     "test:backend": "node --test tests/backend/health.test.js tests/backend/auth.test.js tests/backend/adminUsers.test.js tests/backend/domainModels.test.js tests/backend/allocationLoader.test.js",
     "test:frontend": "node --test tests/frontend/designTokens.test.js tests/frontend/authAndRouting.test.js",
     "load:allocations": "node backend-node/scripts/loadAllocations.js"

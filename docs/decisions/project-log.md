@@ -378,11 +378,61 @@ AI compares, detects anomalies, calculates/receives risk signals, explains findi
     - `npm test` runs **126/126 passing tests across 14 suites** (100% green, 0 failures).
     - Core path independence verified: MP recommend -> District sanction -> compliance evaluate -> Project 360 all execute synchronously without n8n running.
 - **Not done / remaining**:
-  - None (Phase 7 complete and verified). Phase 8 (AI Cost Anomaly & Duplicate Detection) on hold until requested.
+  - None (Phase 7 complete and verified).
 - **Notes**:
   - n8n is strictly background automation; never authentication, RBAC, primary DB, or final decision authority.
   - Zero direct MongoDB connections from n8n nodes; all mutations occur via Express service endpoints.
   - AI risk engine integration hooks stubbed with comments for Phase 9.
+
+### Phase 8: Core AI — Historical Intelligence
+- **Status**: Complete
+- **Exit Checklist**:
+  - [x] Requirements completed
+  - [x] Code reviewed
+  - [x] Feature tested
+  - [x] Security/permissions verified where applicable
+  - [x] Documentation/memory updated where applicable
+  - [x] No known blocking issues
+- **Done**:
+  - Stateless Python AI Analytics Microservice (`ai-service/` with FastAPI):
+    - `POST /ai/cost-anomaly` (AI-01): Non-parametric statistical benchmarking (median, Q1, Q3, IQR, deviation percentage) with statistical upper fence outlier evaluation. Handles `INSUFFICIENT_DATA` when fewer than 2 peers exist.
+    - `POST /ai/duplicate-check` (AI-02): In-process TF-IDF vectorization and cosine similarity over project titles, descriptions, and geographic/ward tokens. Strictly zero external vector databases or Atlas Vector Search per architecture ADR 26.3.
+    - `POST /ai/spec-comparison` (AI-03): Technical sanction estimate vs original recommended outlay drift percentage and scope lexical analysis.
+    - `POST /ai/delay-check` (AI-04): Rules-first execution delay and progress staleness analysis (90-day and 180-day thresholds, overdue sanction timeline).
+    - `POST /ai/payment-progress-check` (AI-05): Financial disbursement percentage vs physical progress percentage gap evaluation.
+    - `GET /health`: Microservice health, telemetry, and engine identification.
+    - Unit tests in `ai-service/tests/`: 16 comprehensive unit tests covering all 5 signals with 100% pass rate (`npm run test:ai`).
+  - Express Backend Orchestration (`backend-node/`):
+    - `src/services/aiClient.js`: Internal HTTP client with configurable timeout (`AI_SERVICE_TIMEOUT_MS`) and resilient `AI_ANALYSIS_UNAVAILABLE` fallback.
+    - `src/services/aiOrchestrator.js`: Gathers project data, enforces jurisdiction-filtered historical peer queries, dispatches concurrent signal evaluations to Python, persists append-only flags to `ai_risk_flags` and evaluation snapshots to `ai_analysis_history`.
+    - `src/routes/ai.js` mounted at `/api/projects/:projectId/ai`:
+      - `POST /api/projects/:projectId/ai/analyze`: Authenticated endpoint to trigger analysis.
+      - `GET  /api/projects/:projectId/ai/findings`: Retrieves stored project risk flags.
+    - Admin Isolation: Strict 403 `ADMIN_ISOLATION` response on all AI endpoints per `rules.md` §10.
+    - Cross-jurisdiction: Enforced 403 `FORBIDDEN_JURISDICTION` boundaries for non-authorized collectors.
+    - Project 360 payload (`GET /api/projects/:projectId`): Enriched to include `ai_findings` array.
+  - Frontend UI Integration (`frontend/`):
+    - `AiHistoricalIntelligencePanel.jsx`: Visualizes all 5 signals using `RiskBadge` (rounded pill) strictly separated from Phase 6 `ComplianceBadge` (square/dot) per `design.md` §5.19 & §5.39.
+    - Prominent "ADVISORY ONLY" indicator and official discretion copy per `rules.md` §12.
+    - Explicit `AI_ANALYSIS_UNAVAILABLE` state handling without faking LOW risk.
+    - Interactive "Re-run AI Analysis" button calling backend.
+    - Integrated into `ProjectDetailModal.jsx` as dedicated "AI Intelligence" tab and overview preview card.
+    - Integrated into `DistrictWorkspace.jsx` Review & Sanction modal for pre-sanction scrutiny.
+    - Admin isolation verified: `AdminWorkspace.jsx` contains no AI risk panels or badges.
+  - Test suites & verification:
+    - Added `tests/backend/aiHistoricalIntelligence.test.js`: 6 backend integration tests covering auth, Admin 403, cross-jurisdiction 403, service down fallback, flag and history persistence, and core path independence.
+    - Added `tests/frontend/phase8AiIntelligence.test.js`: 7 frontend tests covering component exports, RiskBadge compliance, advisory language, unavailable states, modal tabs, and Admin isolation.
+    - Added to `tests/runAll.js`.
+    - Python tests: **16/16 passing**.
+    - Full platform test suite `npm test`: **139/139 passing tests across 16 suites** (100% green, 0 failures).
+    - Frontend build verified: `npm --prefix frontend run build` completed cleanly in ~1s with zero errors.
+- **Not done / remaining**:
+  - None (Phase 8 complete and verified). Phase 9 (Weighted Risk Engine, AI Gateway & Explainable AI) on hold until requested.
+- **Notes**:
+  - Python AI service is stateless and does not connect to MongoDB; Express is the sole authorization and persistence boundary.
+  - Zero external vector databases or LLM calls in Phase 8 (all explanations are structured templates; Gemini Gateway is Phase 9).
+  - Core operations (recommendation, review, sanction, progress, payments) remain 100% functional even when the Python AI service is offline.
+
 
 
 

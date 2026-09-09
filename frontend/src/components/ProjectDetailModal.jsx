@@ -2,6 +2,7 @@ import React, { useState, useEffect, useCallback } from 'react';
 import { useAuth } from '../context/AuthContext';
 import { StatusBadge } from './Badge';
 import Button from './Button';
+import AiHistoricalIntelligencePanel from './AiHistoricalIntelligencePanel';
 
 export function ProjectDetailModal({
   projectId,
@@ -73,6 +74,7 @@ export function ProjectDetailModal({
   const payments = data?.payments || [];
   const ucs = data?.utilization_certificates || [];
   const documents = data?.documents || [];
+  const aiFindings = data?.ai_findings || [];
 
   const isAgency = user?.role === 'IMPLEMENTING_AGENCY';
   const isDistrict = user?.role === 'DISTRICT_AUTHORITY';
@@ -360,6 +362,7 @@ export function ProjectDetailModal({
         >
           {[
             { key: 'overview', label: 'Overview' },
+            { key: 'ai_intelligence', label: `AI Intelligence (${aiFindings.length})` },
             { key: 'engineering', label: `Engineering DPR (${engineeringReports.length})` },
             { key: 'progress', label: `Physical Progress (${progressList.length})` },
             { key: 'payments', label: `Disbursements (${payments.length})` },
@@ -475,7 +478,50 @@ export function ProjectDetailModal({
                       </div>
                     )}
                   </div>
+
+                  <div
+                    style={{
+                      padding: '14px 16px',
+                      border: '1px solid var(--color-border)',
+                      borderRadius: 'var(--radius-sm)',
+                      backgroundColor: '#F8FAFC',
+                      display: 'flex',
+                      justifyContent: 'space-between',
+                      alignItems: 'center',
+                      flexWrap: 'wrap',
+                      gap: '10px',
+                    }}
+                  >
+                    <div>
+                      <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+                        <span style={{ fontWeight: 700, color: 'var(--color-primary)', fontSize: '13px' }}>
+                          AI Historical Intelligence & Risk Signals
+                        </span>
+                        <span style={{ fontSize: '11px', color: 'var(--color-muted)' }}>
+                          • {aiFindings.length > 0 ? `${aiFindings.length} signals evaluated` : 'Analysis pending'}
+                        </span>
+                      </div>
+                      <div style={{ fontSize: '12px', color: 'var(--color-muted)', marginTop: '2px' }}>
+                        Peer cost benchmark, geographical duplicates, engineering deviation, and execution pace checks.
+                      </div>
+                    </div>
+                    <Button size="sm" variant="secondary" onClick={() => setActiveTab('ai_intelligence')}>
+                      View AI Signals ({aiFindings.length}) →
+                    </Button>
+                  </div>
                 </div>
+              )}
+
+              {/* TAB: AI HISTORICAL INTELLIGENCE */}
+              {activeTab === 'ai_intelligence' && (
+                <AiHistoricalIntelligencePanel
+                  projectId={projectId}
+                  initialFlags={aiFindings}
+                  onAnalysisCompleted={() => {
+                    fetchProject360();
+                    if (onProjectUpdated) onProjectUpdated();
+                  }}
+                />
               )}
 
               {/* TAB 2: ENGINEERING REPORTS */}
