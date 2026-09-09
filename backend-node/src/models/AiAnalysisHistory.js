@@ -1,7 +1,7 @@
 /**
  * AI Analysis History Model
  * Collection: ai_analysis_history
- * Historical timeline of risk score evaluations per architecture.md §10.1
+ * Historical timeline of risk score evaluations per architecture.md §10.1 and Phase 9 Section 15.
  * Append-only immutable history log.
  */
 const mongoose = require('mongoose');
@@ -14,6 +14,12 @@ const aiAnalysisHistorySchema = new mongoose.Schema(
       required: [true, 'history_id is required'],
       unique: true,
       trim: true,
+    },
+    analysis_id: {
+      type: String,
+      default: null,
+      trim: true,
+      index: true,
     },
     project_id: {
       type: String,
@@ -37,6 +43,33 @@ const aiAnalysisHistorySchema = new mongoose.Schema(
       type: mongoose.Schema.Types.Mixed,
       default: {},
     },
+    signals: {
+      type: mongoose.Schema.Types.Mixed,
+      default: {},
+    },
+    top_contributors: [
+      {
+        type: { type: String },
+        score: { type: Number },
+        weighted_contribution: { type: Number },
+        weight: { type: Number },
+        severity: { type: String },
+        reason: { type: String },
+      },
+    ],
+    explanation: {
+      type: String,
+      default: '',
+    },
+    status: {
+      type: String,
+      enum: ['COMPLETED', 'DEGRADED', 'FAILED'],
+      default: 'COMPLETED',
+    },
+    version: {
+      type: String,
+      default: '1.0.0',
+    },
     triggered_by: {
       type: String,
       required: [true, 'triggered_by is required'],
@@ -59,8 +92,18 @@ const aiAnalysisHistorySchema = new mongoose.Schema(
   {
     collection: 'ai_analysis_history',
     timestamps: { createdAt: 'created_at', updatedAt: 'updated_at' },
+    toJSON: { virtuals: true },
+    toObject: { virtuals: true },
   }
 );
+
+aiAnalysisHistorySchema.virtual('score').get(function () {
+  return this.overall_score;
+});
+
+aiAnalysisHistorySchema.virtual('level').get(function () {
+  return this.risk_level;
+});
 
 aiAnalysisHistorySchema.index({ project_id: 1, computed_at: -1 });
 
@@ -75,4 +118,3 @@ module.exports = {
   AiAnalysisHistory,
   aiAnalysisHistorySchema,
 };
-

@@ -64,3 +64,21 @@ class PaymentProgressRequest(BaseModel):
     total_disbursed: float = Field(..., description="Cumulative payments approved and disbursed")
     percent_complete: float = Field(..., ge=0.0, le=100.0, description="Latest verified physical progress percentage")
 
+
+class ExplanationRequest(BaseModel):
+    overall_score: int = Field(..., ge=0, le=100, description="Overall aggregated risk score")
+    risk_level: str = Field(..., description="LOW | MEDIUM | HIGH")
+    category: Optional[str] = Field("", description="Work category")
+    top_contributors: List[Dict[str, Any]] = Field(default_factory=list, description="Ranked contributing risk signals")
+    evidence: Dict[str, Any] = Field(default_factory=dict, description="Structured de-identified evidence metrics")
+    provider: Optional[str] = Field("gemini", description="LLM provider: gemini | ollama | mock")
+    model: Optional[str] = Field(None, description="Optional model identifier override")
+
+
+class ExplanationResponse(BaseModel):
+    status: str = Field(..., description="AI_ANALYSIS_COMPLETE | AI_ANALYSIS_UNAVAILABLE | AI_ANALYSIS_PENDING")
+    explanation: str = Field(..., description="Human-readable natural-language explanation")
+    provider: str = Field(..., description="Underlying provider utilized")
+    model: Optional[str] = Field(None, description="Model identifier used")
+    data_minimized: bool = Field(True, description="Strict de-identified evidence adherence guarantee")
+

@@ -3,6 +3,7 @@ import { useAuth } from '../context/AuthContext';
 import { StatusBadge } from './Badge';
 import Button from './Button';
 import AiHistoricalIntelligencePanel from './AiHistoricalIntelligencePanel';
+import AiReviewPanel from './AiReviewPanel';
 
 export function ProjectDetailModal({
   projectId,
@@ -512,16 +513,26 @@ export function ProjectDetailModal({
                 </div>
               )}
 
-              {/* TAB: AI HISTORICAL INTELLIGENCE */}
+              {/* TAB: AI HISTORICAL INTELLIGENCE & EXPLAINABLE RISK */}
               {activeTab === 'ai_intelligence' && (
-                <AiHistoricalIntelligencePanel
-                  projectId={projectId}
-                  initialFlags={aiFindings}
-                  onAnalysisCompleted={() => {
-                    fetchProject360();
-                    if (onProjectUpdated) onProjectUpdated();
-                  }}
-                />
+                <div style={{ display: 'flex', flexDirection: 'column', gap: 'var(--space-5)' }}>
+                  <AiReviewPanel
+                    projectId={projectId}
+                    initialRisk={data?.current_risk}
+                    onAnalysisCompleted={() => {
+                      fetchProject360();
+                      if (onProjectUpdated) onProjectUpdated();
+                    }}
+                  />
+                  <AiHistoricalIntelligencePanel
+                    projectId={projectId}
+                    initialFlags={aiFindings}
+                    onAnalysisCompleted={() => {
+                      fetchProject360();
+                      if (onProjectUpdated) onProjectUpdated();
+                    }}
+                  />
+                </div>
               )}
 
               {/* TAB 2: ENGINEERING REPORTS */}

@@ -53,8 +53,9 @@ export function AuthProvider({ children }) {
         if (res.ok) {
           const body = await res.json();
           if (body.success && body.data) {
-            setUser(body.data);
-            localStorage.setItem(STORAGE_KEY_USER, JSON.stringify(body.data));
+            const userData = body.data.user || body.data;
+            setUser(userData);
+            localStorage.setItem(STORAGE_KEY_USER, JSON.stringify(userData));
           } else {
             setAuthSession(null, null);
           }

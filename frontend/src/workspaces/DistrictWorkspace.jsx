@@ -7,6 +7,7 @@ import Button from '../components/Button';
 import { StatusBadge } from '../components/Badge';
 import ProjectDetailModal from '../components/ProjectDetailModal';
 import AiHistoricalIntelligencePanel from '../components/AiHistoricalIntelligencePanel';
+import AiReviewPanel from '../components/AiReviewPanel';
 
 export function DistrictWorkspace() {
   const { user, authFetch } = useAuth();
@@ -506,8 +507,15 @@ export function DistrictWorkspace() {
                 </div>
               </div>
 
-              {/* AI Historical Intelligence & Risk Signals */}
-              <div style={{ marginBottom: 'var(--space-5)' }}>
+              {/* AI-Assisted Risk Review & Decision Support */}
+              <div style={{ display: 'flex', flexDirection: 'column', gap: 'var(--space-4)', marginBottom: 'var(--space-5)' }}>
+                <AiReviewPanel
+                  projectId={reviewProject.project_id}
+                  initialRisk={null}
+                  onAnalysisCompleted={() => {
+                    fetchProjects();
+                  }}
+                />
                 <AiHistoricalIntelligencePanel
                   projectId={reviewProject.project_id}
                   initialFlags={[]}

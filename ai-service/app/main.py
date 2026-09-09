@@ -12,12 +12,15 @@ from app.schemas import (
     SpecComparisonRequest,
     DelayCheckRequest,
     PaymentProgressRequest,
+    ExplanationRequest,
+    ExplanationResponse,
 )
 from app.services.cost_service import analyze_cost_anomaly
 from app.services.duplicate_service import analyze_duplicates
 from app.services.spec_service import analyze_spec_comparison
 from app.services.delay_service import analyze_delay
 from app.services.payment_service import analyze_payment_progress
+from app.gateway.ai_gateway import ai_gateway
 
 app = FastAPI(
     title="MPLADS AI Analytics Service",
@@ -83,4 +86,21 @@ def payment_progress_endpoint(req: PaymentProgressRequest):
         return analyze_payment_progress(req)
     except Exception as e:
         raise HTTPException(status_code=500, detail=f"Payment progress check error: {str(e)}")
+
+
+@app.post("/ai/explain", response_model=ExplanationResponse)
+def explain_endpoint(req: ExplanationRequest):
+    try:
+        res = ai_gateway.generate_explanation(
+            overall_score=req.overall_score,
+            risk_level=req.risk_level,
+            category=req.category,
+            top_contributors=req.top_contributors,
+            evidence=req.evidence,
+            provider=req.provider,
+            model=req.model,
+        )
+        return ExplanationResponse(**res)
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=f"AI Gateway explanation error: {str(e)}")
 

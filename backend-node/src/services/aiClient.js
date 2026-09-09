@@ -118,6 +118,14 @@ class AiClient {
   async checkPaymentProgress(payload) {
     return this._post('/ai/payment-progress-check', payload);
   }
+
+  /**
+   * Phase 9 AI Gateway: Generate Natural-Language Advisory Explanation
+   * Dispatches de-identified structured evidence to Python microservice /ai/explain
+   */
+  async generateExplanation(payload) {
+    return this._post('/ai/explain', payload);
+  }
 }
 
 module.exports = new AiClient();

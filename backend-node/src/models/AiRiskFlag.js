@@ -1,7 +1,7 @@
 /**
  * AI Risk Flag Model
  * Collection: ai_risk_flags
- * Individual AI and deterministic rule findings per architecture.md §10.1 & §13
+ * Individual AI and deterministic rule findings per architecture.md §10.1, §13, and Phase 9 requirements.
  * Append-only immutable finding record.
  */
 const mongoose = require('mongoose');
@@ -9,16 +9,23 @@ const appendOnlyPlugin = require('./plugins/appendOnlyPlugin');
 
 const RISK_FLAG_TYPES = [
   'COST_ANOMALY',
+  'DUPLICATE_RISK',
   'DUPLICATE_OVERLAP',
+  'SPECIFICATION_DEVIATION',
   'SPEC_DEVIATION',
+  'PAYMENT_PROGRESS_ANOMALY',
   'PAYMENT_PROGRESS_MISMATCH',
+  'DELAY_RISK',
   'DELAY_STALENESS',
-  'AGENCY_CONCENTRATION_RISK',
+  'COMPLIANCE_FLAG',
   'SC_ST_NON_COMPLIANCE',
   'UC_OVERDUE',
+  'HISTORICAL_PATTERN',
+  'AGENCY_CONCENTRATION_RISK',
 ];
 
 const SEVERITY_LEVELS = ['LOW', 'MEDIUM', 'HIGH'];
+const FLAG_STATUSES = ['ACTIVE', 'RESOLVED', 'DISMISSED'];
 
 const aiRiskFlagSchema = new mongoose.Schema(
   {
@@ -73,6 +80,27 @@ const aiRiskFlagSchema = new mongoose.Schema(
       type: mongoose.Schema.Types.Mixed,
       default: {},
     },
+    evidence: {
+      type: mongoose.Schema.Types.Mixed,
+      default: {},
+    },
+    analysis_id: {
+      type: String,
+      default: null,
+      index: true,
+      trim: true,
+    },
+    source: {
+      type: String,
+      default: 'PYTHON_AI_SERVICE',
+      trim: true,
+    },
+    status: {
+      type: String,
+      enum: FLAG_STATUSES,
+      default: 'ACTIVE',
+      index: true,
+    },
     is_real_government_data: {
       type: Boolean,
       default: false,
@@ -85,10 +113,18 @@ const aiRiskFlagSchema = new mongoose.Schema(
   {
     collection: 'ai_risk_flags',
     timestamps: { createdAt: 'created_at', updatedAt: 'updated_at' },
+    toJSON: { virtuals: true },
+    toObject: { virtuals: true },
   }
 );
 
+// Virtual alias for score -> risk_score
+aiRiskFlagSchema.virtual('score').get(function () {
+  return this.risk_score;
+});
+
 aiRiskFlagSchema.index({ project_id: 1, created_at: -1 });
+aiRiskFlagSchema.index({ project_id: 1, flag_type: 1 });
 
 aiRiskFlagSchema.plugin(appendOnlyPlugin);
 
@@ -99,5 +135,5 @@ module.exports = {
   aiRiskFlagSchema,
   RISK_FLAG_TYPES,
   SEVERITY_LEVELS,
+  FLAG_STATUSES,
 };
-

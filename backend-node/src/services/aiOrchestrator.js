@@ -1,12 +1,16 @@
 /**
- * AI Orchestration Service
+ * AI Orchestration Service (Phase 8 & Phase 9)
  * Assembles project data, queries in-jurisdiction peer works,
- * dispatches analysis requests to the Python AI service, and persists
- * append-only findings in ai_risk_flags and ai_analysis_history.
- * Complies with architecture.md §4, §13, and rules.md §4, §10, §12.
+ * dispatches analysis requests to the Python AI service, executes the explainable
+ * Risk Engine aggregation, obtains natural language explanation via AI Gateway,
+ * and persists append-only findings in ai_risk_flags, current combined risk in
+ * ai_risk_scores, and timeline snapshots in ai_analysis_history.
+ * Complies with architecture.md §4, §10.1, §13, §15.5 and rules.md §4, §10, §12.
  */
 const crypto = require('crypto');
 const aiClient = require('./aiClient');
+const riskEngine = require('./riskEngine');
+const aiGateway = require('./aiGateway');
 const logger = require('../utils/logger');
 const {
   Project,
@@ -14,13 +18,15 @@ const {
   EngineeringReport,
   ProjectProgress,
   ProjectPayment,
+  ComplianceFinding,
   AiRiskFlag,
+  AiRiskScore,
   AiAnalysisHistory,
 } = require('../models');
 
 class AiOrchestrator {
   /**
-   * Run Phase 8 historical intelligence analysis on a single project
+   * Run comprehensive Phase 9 risk and historical intelligence analysis on a project
    */
   async analyzeProject(projectId, user) {
     const pId = projectId.trim().toUpperCase();
@@ -29,19 +35,19 @@ class AiOrchestrator {
       throw new Error(`Project '${pId}' not found`);
     }
 
-    // 1. Gather project context from related collections
-    const [recommendation, engineeringReports, progressHistory, payments] = await Promise.all([
+    // 1. Gather project context and related domain collections
+    const [recommendation, engineeringReports, progressHistory, payments, complianceFindings] = await Promise.all([
       ProjectRecommendation.findOne({ project_id: pId }).lean(),
       EngineeringReport.find({ project_id: pId }).sort({ version: -1 }).lean(),
       ProjectProgress.find({ project_id: pId }).sort({ reported_at: -1 }).lean(),
       ProjectPayment.find({ project_id: pId, status: { $in: ['APPROVED', 'DISBURSED'] } }).lean(),
+      ComplianceFinding.find({ project_id: pId }).lean(),
     ]);
 
     const latestDpr = engineeringReports.length > 0 ? engineeringReports[0] : null;
     const latestProgress = progressHistory.length > 0 ? progressHistory[0] : null;
 
     // 2. Query in-jurisdiction peer works for cost benchmark (AI-01)
-    // Filter peers by category and district/state
     const peerQuery = {
       project_id: { $ne: pId },
       category: project.category,
@@ -61,7 +67,6 @@ class AiOrchestrator {
       .filter((c) => typeof c === 'number' && c > 0);
 
     // 3. Query candidate projects for duplicate detection (AI-02)
-    // Same district or constituency works, active or completed
     const candidateProjects = await Project.find({
       project_id: { $ne: pId },
       district: project.district,
@@ -168,10 +173,12 @@ class AiOrchestrator {
         status: 'AI_ANALYSIS_UNAVAILABLE',
         message: 'AI analysis service is temporarily unavailable. Structured project information is still shown.',
         flags: [],
+        overall_score: null,
+        risk_level: null,
       };
     }
 
-    // 8. Process valid signals and prepare append-only records
+    // 8. Process raw signals from Python service
     const rawSignals = [
       costRes.data,
       dupRes.data,
@@ -180,13 +187,27 @@ class AiOrchestrator {
       paymentRes.data,
     ].filter(Boolean);
 
-    const storedFlags = [];
-    const componentScores = {};
+    // 9. Execute Explainable Risk Engine Aggregation (Phase 9)
+    const riskAssessment = riskEngine.aggregateRisk(project, rawSignals, complianceFindings);
 
+    // 10. Request Natural Language Explanation via AI Gateway (with de-identified evidence)
+    const explanationResult = await aiGateway.generateExplanation({
+      overallScore: riskAssessment.overall_score,
+      riskLevel: riskAssessment.risk_level,
+      category: project.category,
+      topContributors: riskAssessment.top_contributors,
+      evidence: riskAssessment.evidence,
+    });
+
+    const analysisId = `ANALYSIS-${crypto.randomBytes(6).toString('hex').toUpperCase()}`;
+
+    // 11. Persist individual findings in ai_risk_flags (append-only)
+    const storedFlags = [];
     for (const sig of rawSignals) {
       const flagId = `FLAG-${crypto.randomBytes(6).toString('hex').toUpperCase()}`;
       const flagDoc = {
         flag_id: flagId,
+        analysis_id: analysisId,
         project_id: pId,
         flag_type: sig.signal_type,
         risk_score: sig.score,
@@ -194,53 +215,106 @@ class AiOrchestrator {
         explanation: sig.message,
         model_or_rule: sig.model_or_rule,
         signals: sig.evidence || {},
+        evidence: sig.evidence || {},
+        source: 'PYTHON_AI_SERVICE',
+        status: 'ACTIVE',
         is_real_government_data: Boolean(project.is_real_government_data),
         is_synthetic: Boolean(project.is_synthetic),
       };
 
       await AiRiskFlag.create(flagDoc);
       storedFlags.push(flagDoc);
-
-      const componentKey = sig.signal_type.toLowerCase();
-      componentScores[componentKey] = sig.score;
     }
 
-    // Determine highest provisional severity and mean score
-    const scores = rawSignals.map((s) => s.score);
-    const avgScore = scores.length > 0 ? Math.round(scores.reduce((a, b) => a + b, 0) / scores.length) : 0;
-    let maxSeverity = 'LOW';
-    if (rawSignals.some((s) => s.severity === 'HIGH')) {
-      maxSeverity = 'HIGH';
-    } else if (rawSignals.some((s) => s.severity === 'MEDIUM')) {
-      maxSeverity = 'MEDIUM';
-    }
+    // 12. Upsert current combined risk in ai_risk_scores
+    await AiRiskScore.findOneAndUpdate(
+      { project_id: pId },
+      {
+        project_id: pId,
+        overall_score: riskAssessment.overall_score,
+        risk_level: riskAssessment.risk_level,
+        component_scores: riskAssessment.component_scores,
+        signals: riskAssessment.signals,
+        top_contributors: riskAssessment.top_contributors,
+        contributing_signals: riskAssessment.evaluated_signals.map((s) => ({
+          signal_name: s.type,
+          weight: s.weight,
+          score: s.score,
+          explanation: s.reason,
+        })),
+        explanation: explanationResult.explanation,
+        ai_status: explanationResult.status,
+        analysis_id: analysisId,
+        computed_at: new Date(),
+        is_real_government_data: Boolean(project.is_real_government_data),
+        is_synthetic: Boolean(project.is_synthetic),
+      },
+      { upsert: true, new: true }
+    );
 
-    // 9. Save historical evaluation record
+    // 13. Persist historical timeline snapshot in ai_analysis_history (append-only)
     const historyId = `HIST-${crypto.randomBytes(6).toString('hex').toUpperCase()}`;
     await AiAnalysisHistory.create({
       history_id: historyId,
+      analysis_id: analysisId,
       project_id: pId,
-      overall_score: avgScore, // Provisional signal-level average (Phase 9 implements weighted risk engine)
-      risk_level: maxSeverity,
-      component_scores: componentScores,
+      overall_score: riskAssessment.overall_score,
+      risk_level: riskAssessment.risk_level,
+      component_scores: riskAssessment.component_scores,
+      signals: riskAssessment.signals,
+      top_contributors: riskAssessment.top_contributors,
+      explanation: explanationResult.explanation,
+      status: explanationResult.status === 'AI_ANALYSIS_COMPLETE' ? 'COMPLETED' : 'DEGRADED',
+      version: '1.0.0',
       triggered_by: user?.user_id || 'SYSTEM_TRIGGER',
       computed_at: new Date(),
       is_real_government_data: Boolean(project.is_real_government_data),
       is_synthetic: Boolean(project.is_synthetic),
     });
 
-    logger.info(`AI Historical Intelligence analysis completed for ${pId}`, {
-      flagsGenerated: storedFlags.length,
-      maxSeverity,
+    logger.info(`Phase 9 Risk assessment evaluated for ${pId}`, {
+      analysisId,
+      overallScore: riskAssessment.overall_score,
+      riskLevel: riskAssessment.risk_level,
+      aiStatus: explanationResult.status,
+      flagsCount: storedFlags.length,
     });
 
     return {
       available: true,
       status: 'OK',
-      provisional_level: maxSeverity,
+      analysis_id: analysisId,
+      overall_score: riskAssessment.overall_score,
+      risk_level: riskAssessment.risk_level,
+      provisional_level: riskAssessment.risk_level, // Phase 8 test backward compatibility
+      component_scores: riskAssessment.component_scores,
+      signals: riskAssessment.signals,
+      top_contributors: riskAssessment.top_contributors,
+      explanation: explanationResult.explanation,
+      ai_status: explanationResult.status,
       flags: storedFlags,
       evaluated_at: new Date(),
     };
+  }
+
+  /**
+   * Retrieve current combined risk score for a project
+   */
+  async getProjectRisk(projectId) {
+    const pId = projectId.trim().toUpperCase();
+    const riskScore = await AiRiskScore.findOne({ project_id: pId }).lean();
+    return riskScore;
+  }
+
+  /**
+   * Retrieve historical risk evaluations for a project (chronological)
+   */
+  async getProjectRiskHistory(projectId) {
+    const pId = projectId.trim().toUpperCase();
+    const history = await AiAnalysisHistory.find({ project_id: pId })
+      .sort({ computed_at: -1 })
+      .lean();
+    return history;
   }
 
   /**
@@ -257,4 +331,3 @@ class AiOrchestrator {
 }
 
 module.exports = new AiOrchestrator();
-

@@ -139,4 +139,6 @@ router.get('/findings', authenticate, async (req, res, next) => {
 });
 
 module.exports = router;
+module.exports.verifyProjectAiAccess = verifyProjectAiAccess;
+module.exports.resolveMpId = resolveMpId;
 

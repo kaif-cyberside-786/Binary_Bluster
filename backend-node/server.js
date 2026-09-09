@@ -2,6 +2,7 @@
  * Server Entry Point
  * Starts HTTP listener and initializes MongoDB connection.
  */
+const http = require('http');
 const app = require('./src/app');
 const config = require('./src/config/env');
 const { connectDB, closeDB, getDatabaseStatus } = require('./src/config/db');
@@ -33,10 +34,7 @@ async function startServer() {
     }
   }
 
-  const server = app.listen(config.port, () => {
-    logger.info(`MPLADS Backend Server running in [${config.env}] mode on port ${config.port}`);
-    logger.info(`Health check available at http://localhost:${config.port}/api/health`);
-  });
+  const server = http.createServer(app);
 
   server.on('error', async (err) => {
     if (err.code === 'EADDRINUSE') {
@@ -46,6 +44,11 @@ async function startServer() {
     }
     await closeDB();
     process.exit(1);
+  });
+
+  server.listen(config.port, () => {
+    logger.info(`MPLADS Backend Server running in [${config.env}] mode on port ${config.port}`);
+    logger.info(`Health check available at http://localhost:${config.port}/api/health`);
   });
 
   // Graceful shutdown

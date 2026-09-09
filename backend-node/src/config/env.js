@@ -58,9 +58,13 @@ const config = {
   internalApiBaseUrl: process.env.INTERNAL_API_BASE_URL || 'http://localhost:5000',
   n8nBaseUrl: process.env.N8N_BASE_URL || 'http://localhost:5678',
 
-  // AI Service (Phase 8)
+  // AI Service & Risk Engine (Phase 8 & 9)
   aiServiceUrl: process.env.AI_SERVICE_URL || 'http://localhost:8000',
   aiServiceTimeoutMs: parseInt(process.env.AI_SERVICE_TIMEOUT_MS, 10) || 5000,
+  geminiApiKey: process.env.GEMINI_API_KEY || '',
+  geminiModel: process.env.GEMINI_MODEL || 'gemini-1.5-flash',
+  aiGatewayProvider: process.env.AI_GATEWAY_PROVIDER || 'gemini',
+  aiGatewayTimeoutMs: parseInt(process.env.AI_GATEWAY_TIMEOUT_MS, 10) || 8000,
 };
 
 module.exports = config;

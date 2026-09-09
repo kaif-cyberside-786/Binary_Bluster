@@ -428,10 +428,56 @@ AI compares, detects anomalies, calculates/receives risk signals, explains findi
     - Frontend build verified: `npm --prefix frontend run build` completed cleanly in ~1s with zero errors.
 - **Not done / remaining**:
   - None (Phase 8 complete and verified). Phase 9 (Weighted Risk Engine, AI Gateway & Explainable AI) on hold until requested.
+### Phase 9: Risk Engine, AI Gateway & Explainable AI
+- **Status**: Complete
+- **Exit Checklist**:
+  - [x] Requirements completed
+  - [x] Code reviewed
+  - [x] Feature tested
+  - [x] Security/permissions verified where applicable
+  - [x] Documentation/memory updated where applicable
+  - [x] No known blocking issues
+- **Done**:
+  - Provider-Neutral AI Gateway (`ai-service/app/gateway/`):
+    - `gemini_adapter.py`: Production adapter calling Google Generative AI (Gemini 1.5 Flash) with strict data minimization prompt, advisory copy enforcement, and fallback handling.
+    - `ai_gateway.py`: Gateway interface routing requests dynamically across `gemini`, `ollama`, and deterministic `mock` fallback.
+    - `schemas.py` & `main.py`: Added `POST /ai/explain` endpoint accepting de-identified evidence and returning structured explanation and confidence score.
+    - 3 unit tests in `ai-service/tests/test_gateway.py` (total 19 Python unit tests passing).
+  - Deterministic Explainable Weighted Risk Engine (`backend-node/`):
+    - `src/config/riskWeights.js`: Centralized risk weight configuration (Cost: 0.25, Duplicate: 0.25, Spec: 0.15, Payment Progress: 0.15, Delay: 0.10, Compliance: 0.10, Historical: 0.00) summing exactly to 1.0. Canonical risk level thresholds: `LOW` (0–39), `MEDIUM` (40–74), `HIGH` (75–100).
+    - `src/services/riskEngine.js`: Normalization layer converting raw findings into 0-100 scores, computing weighted contributions, selecting top contributors, and producing strictly de-identified evidence payloads.
+    - `src/services/aiGateway.js`: Express gateway wrapper forwarding to Python service with offline graceful fallback to deterministic rule-based explanations.
+    - `src/services/aiOrchestrator.js`: Integrated Phase 9 multi-signal risk aggregation into `analyzeProject`, saving combined score in `ai_risk_scores`, granular flags in `ai_risk_flags`, and audit trail in `ai_analysis_history`. Added `getProjectRisk` and `getProjectRiskHistory`.
+    - `src/routes/risk.js` mounted at `/api/projects/:projectId/risk`:
+      - `GET  /api/projects/:projectId/risk`: Returns current evaluated project risk score and top contributors.
+      - `GET  /api/projects/:projectId/risk/history`: Retrieves chronological risk score history.
+      - `GET  /api/projects/:projectId/risk/flags`: Retrieves individual risk flags.
+      - `POST /api/projects/:projectId/risk/analyze`: Triggers full end-to-end evaluation.
+    - Enforced 403 `ADMIN_ISOLATION` on all risk endpoints (`rules.md` §10) and cross-district boundaries (`FORBIDDEN_JURISDICTION`).
+    - Enriched Project 360 payload (`GET /api/projects/:projectId`) with `current_risk`.
+  - Frontend UI Integration (`frontend/`):
+    - `AiReviewPanel.jsx`: Complete risk assessment interface featuring:
+      - Prominent `RiskBadge` with score pill and risk level (`LOW`: 0–39, `MEDIUM`: 40–74, `HIGH`: 75–100).
+      - Explicit AI status pill (`AI ANALYSIS COMPLETE`, `AI ANALYSIS PENDING`, `AI ANALYSIS UNAVAILABLE`).
+      - Advisory indicator: *"Advisory Only — Administrative Discretion Required"*.
+      - `RiskBreakdown`: Visual progress bars for contributing factors with weights and points.
+      - Natural language explanation narrative card with provider attribution.
+      - Accessible expandable JSON evidence drawer (`aria-expanded`) showing exact de-identified evidence tokens.
+    - Integrated into `ProjectDetailModal.jsx` (AI tab) and `DistrictWorkspace.jsx` (Review & Sanction modal).
+    - Verified strict Admin Isolation: `AdminWorkspace.jsx` does not expose risk panels or scores.
+  - Automated Tests:
+    - `tests/backend/riskEnginePhase9.test.js`: 9 tests verifying risk weights, thresholds, normalization, multi-signal aggregation, data minimization, AI Gateway fallback, 403 Admin Isolation, 403 cross-jurisdiction isolation, and end-to-end persistence. All 9 pass.
+    - `tests/frontend/phase9RiskPanel.test.js`: 8 tests verifying component exports, RiskBadge usage, status labels, advisory wording, evidence drawer, modal integration, and Admin isolation. All 8 pass.
+    - Frontend unit test suite: **59/59 tests passing**.
+    - Python AI microservice test suite: **19/19 tests passing**.
+    - Production build: `npm --prefix frontend run build` completes in 2.38s with 0 errors.
+- **Not done / remaining**:
+  - None (Phase 9 complete and verified). Ready for Phase 10: District Authority AI Review UX & Inspection Queue.
 - **Notes**:
-  - Python AI service is stateless and does not connect to MongoDB; Express is the sole authorization and persistence boundary.
-  - Zero external vector databases or LLM calls in Phase 8 (all explanations are structured templates; Gemini Gateway is Phase 9).
-  - Core operations (recommendation, review, sanction, progress, payments) remain 100% functional even when the Python AI service is offline.
+  - Express is the sole authorization and persistence boundary. React and n8n never call the Python microservice directly.
+  - Gemini receives zero PII, personal tokens, or raw documents; only de-identified numbers, percentages, and category labels are passed to the AI Gateway.
+  - Advisory language strictly observed throughout UI and AI Gateway; system never produces *"Fraud confirmed"* or automatic sanctions/rejections.
+
 
 
 

@@ -25,6 +25,7 @@ const {
   Document,
   ComplianceFinding,
   AiRiskFlag,
+  AiRiskScore,
   PROJECT_CATEGORIES,
   PROJECT_STATUSES,
   DECISION_TYPES,
@@ -395,6 +396,7 @@ router.get('/:projectId', authenticate, async (req, res, next) => {
       documents,
       complianceFindings,
       aiFindings,
+      currentRisk,
     ] = await Promise.all([
       ProjectRecommendation.findOne({ project_id: projectId }).lean(),
       OfficerDecision.find({ project_id: projectId }).sort({ decided_at: -1 }).lean(),
@@ -405,6 +407,7 @@ router.get('/:projectId', authenticate, async (req, res, next) => {
       Document.find({ project_id: projectId }).sort({ uploaded_at: -1 }).select('-__v').lean(),
       ComplianceFinding.find({ project_id: projectId }).sort({ rule_id: 1 }).lean(),
       AiRiskFlag.find({ project_id: projectId }).sort({ created_at: -1 }).lean(),
+      AiRiskScore.findOne({ project_id: projectId }).lean(),
     ]);
 
     // Compute overall compliance status
@@ -435,6 +438,7 @@ router.get('/:projectId', authenticate, async (req, res, next) => {
           findings: complianceFindings || [],
         },
         ai_findings: aiFindings || [],
+        current_risk: currentRisk || null,
       },
       'Project details retrieved successfully'
     );
@@ -445,6 +449,9 @@ router.get('/:projectId', authenticate, async (req, res, next) => {
 
 // Mount AI historical intelligence routes (/api/projects/:projectId/ai/...)
 router.use('/:projectId/ai', require('./ai'));
+
+// Mount Phase 9 explainable risk routes (/api/projects/:projectId/risk/...)
+router.use('/:projectId/risk', require('./risk'));
 
 // Alias for explicit detail endpoint
 router.get('/:projectId/detail', authenticate, async (req, res, next) => {
