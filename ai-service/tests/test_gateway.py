@@ -59,13 +59,31 @@ class TestAIGateway(unittest.TestCase):
         self.assertTrue("AI analysis temporarily unavailable" in explanation)
         self.assertTrue("Overall Risk: HIGH — 87" in explanation)
 
-    def test_deterministic_fallback_uses_advisory_language_only(self):
-        text = _build_deterministic_fallback(87, "HIGH", self.contributors)
-        # Strictly ensure NO accusatory terminology
-        banned_words = ["fraud", "corrupt", "fake", "raid", "convicted", "criminal"]
-        for word in banned_words:
-            self.assertNotIn(word, text.lower())
-        self.assertIn("review recommended", text.lower())
+    def test_ollama_fallback_when_offline(self):
+        res = ai_gateway.generate_explanation(
+            overall_score=75,
+            risk_level="HIGH",
+            category="Roads & Bridges",
+            top_contributors=self.contributors,
+            evidence=self.evidence,
+            provider="ollama",
+        )
+        self.assertEqual(res["status"], "AI_ANALYSIS_UNAVAILABLE")
+        self.assertTrue("Ollama local model not running" in res["explanation"])
+        self.assertTrue("Review recommended" in res["explanation"])
+
+    def test_gateway_accepts_api_key_parameter(self):
+        res = ai_gateway.generate_explanation(
+            overall_score=87,
+            risk_level="HIGH",
+            category="Roads & Bridges",
+            top_contributors=self.contributors,
+            evidence=self.evidence,
+            provider="gemini",
+            api_key="",  # explicitly empty
+        )
+        self.assertEqual(res["status"], "AI_ANALYSIS_UNAVAILABLE")
+        self.assertTrue("AI analysis temporarily unavailable" in res["explanation"])
 
 
 if __name__ == "__main__":

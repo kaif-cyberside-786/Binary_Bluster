@@ -15,14 +15,50 @@ class MockAdapter:
 
 
 class OllamaAdapter:
-    """Local Ollama adapter placeholder for future air-gapped or local government deployment."""
-    def __init__(self, base_url: str = "http://localhost:11434"):
-        self.base_url = base_url
+    """Local Ollama adapter with graceful fallback if Ollama service is not running."""
+    def __init__(self, base_url: str = None):
+        import os
+        self.base_url = (base_url or os.getenv("OLLAMA_BASE_URL", "http://localhost:11434")).rstrip("/")
 
-    def generate(self, overall_score: int, risk_level: str, category: str, top_contributors: list, evidence: Dict[str, Any]):
-        # Future Ollama integration
+    def generate(self, overall_score: int, risk_level: str, category: str, top_contributors: list, evidence: Dict[str, Any], model: str = None):
+        import urllib.request
+        import urllib.error
+        import json
+        import os
+
+        target_model = model or os.getenv("OLLAMA_MODEL", "llama3")
         fallback = _build_deterministic_fallback(overall_score, risk_level, top_contributors)
-        return "AI_ANALYSIS_UNAVAILABLE", f"Ollama local model not running.\n{fallback}", "ollama-llama3"
+
+        prompt = (
+            f"You are an AI decision support assistant for MPLADS in India.\n"
+            f"Produce an advisory explanation for overall risk {risk_level} (score {overall_score}) in category '{category}'.\n"
+            f"Advisory only. Never say fraud or corruption. Maximum 100 words.\n"
+            f"Metrics: {json.dumps(evidence)}"
+        )
+
+        req_data = json.dumps({
+            "model": target_model,
+            "prompt": prompt,
+            "stream": False,
+        }).encode("utf-8")
+
+        try:
+            req = urllib.request.Request(
+                f"{self.base_url}/api/generate",
+                data=req_data,
+                headers={"Content-Type": "application/json"},
+                method="POST",
+            )
+            with urllib.request.urlopen(req, timeout=6.0) as resp:
+                if resp.status == 200:
+                    data = json.loads(resp.read().decode("utf-8"))
+                    text = data.get("response", "").strip()
+                    if text:
+                        return "AI_ANALYSIS_COMPLETE", text, target_model
+        except Exception:
+            pass
+
+        return "AI_ANALYSIS_UNAVAILABLE", f"Ollama local model not running.\n{fallback}", target_model
 
 
 class AIGateway:
@@ -40,21 +76,23 @@ class AIGateway:
         evidence: Dict[str, Any] = None,
         provider: str = "gemini",
         model: str = None,
+        api_key: str = None,
     ):
         top_contributors = top_contributors or []
         evidence = evidence or {}
 
         # Provider routing
-        if provider == "mock":
+        prov = (provider or "gemini").lower().strip()
+        if prov == "mock":
             status, text, used_model = self.mock_adapter.generate(
                 overall_score, risk_level, category, top_contributors, evidence
             )
-        elif provider == "ollama":
+        elif prov == "ollama":
             status, text, used_model = self.ollama_adapter.generate(
-                overall_score, risk_level, category, top_contributors, evidence
+                overall_score, risk_level, category, top_contributors, evidence, model=model
             )
         else:
-            adapter = GeminiAdapter(model=model) if model else self.gemini_adapter
+            adapter = GeminiAdapter(api_key=api_key, model=model) if (api_key is not None or model) else self.gemini_adapter
             status, text, used_model = adapter.generate(
                 overall_score, risk_level, category, top_contributors, evidence
             )
@@ -62,7 +100,7 @@ class AIGateway:
         return {
             "status": status,
             "explanation": text,
-            "provider": provider,
+            "provider": prov,
             "model": used_model,
             "data_minimized": True,
         }

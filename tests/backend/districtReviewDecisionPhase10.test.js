@@ -193,10 +193,14 @@ describe('Phase 10: District AI Review & Human Decision Tests', () => {
       await ComplianceFinding.create({
         finding_id: 'CMP-P10-01',
         project_id: testProjectId1,
+        mp_id: mpId,
+        district: 'Indore',
+        state: 'Madhya Pradesh',
         rule_id: 'RULE_PROHIBITED_COMMERCIAL',
-        rule_name: 'Commercial Works Restriction',
+        rule_category: 'ELIGIBILITY',
         severity: 'MEDIUM',
-        status: 'OPEN',
+        status: 'REVIEW_REQUIRED',
+        title: 'Commercial Works Restriction',
         message: 'Ensure the proposed community hall is not for commercial leasing.',
       });
     } else {
@@ -301,6 +305,7 @@ describe('Phase 10: District AI Review & Human Decision Tests', () => {
       await mongoose.connection.collection('projects').deleteMany({ project_id: { $in: pids } });
       await mongoose.connection.collection('officer_decisions').deleteMany({ project_id: { $in: pids } });
       await mongoose.connection.collection('ai_risk_scores').deleteMany({ project_id: { $in: pids } });
+      await mongoose.connection.collection('compliance_findings').deleteMany({ project_id: { $in: pids } });
       await mongoose.disconnect();
     }
     if (server?.closeAllConnections) server.closeAllConnections();

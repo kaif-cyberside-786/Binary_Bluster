@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { useAuth } from '../context/AuthContext';
 import { RiskBadge } from './Badge';
 import Button from './Button';
@@ -7,8 +7,9 @@ import Button from './Button';
  * RiskBreakdown Component (Phase 9)
  * Renders the ranked contributors to the overall risk assessment.
  */
-export function RiskBreakdown({ contributors = [] }) {
-  if (!contributors || contributors.length === 0) {
+export function RiskBreakdown({ contributors = [], topContributors = [], componentScores = {} }) {
+  const items = (contributors && contributors.length > 0) ? contributors : (topContributors || []);
+  if (!items || items.length === 0) {
     return (
       <div
         style={{
@@ -27,7 +28,7 @@ export function RiskBreakdown({ contributors = [] }) {
 
   return (
     <div style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>
-      {contributors.map((c, idx) => {
+      {items.map((c, idx) => {
         const typeName = (c.type || '').replace(/_/g, ' ').toLowerCase().replace(/\b\w/g, (l) => l.toUpperCase());
         return (
           <div
@@ -82,6 +83,10 @@ export function AiReviewPanel({
   const [analyzing, setAnalyzing] = useState(false);
   const [showEvidence, setShowEvidence] = useState(false);
   const [error, setError] = useState(null);
+
+  useEffect(() => {
+    setRisk(initialRisk);
+  }, [initialRisk]);
 
   const handleRunAnalysis = async () => {
     if (!projectId) return;

@@ -73,6 +73,7 @@ class ExplanationRequest(BaseModel):
     evidence: Dict[str, Any] = Field(default_factory=dict, description="Structured de-identified evidence metrics")
     provider: Optional[str] = Field("gemini", description="LLM provider: gemini | ollama | mock")
     model: Optional[str] = Field(None, description="Optional model identifier override")
+    api_key: Optional[str] = Field(None, description="Optional API key passed from configuration")
 
 
 class ExplanationResponse(BaseModel):

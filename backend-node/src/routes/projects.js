@@ -12,6 +12,7 @@ const path = require('path');
 const fs = require('fs');
 const { withTransaction } = require('../utils/transaction');
 const { handleDocumentUpload, computeFileHash } = require('../middleware/upload');
+const aiOrchestrator = require('../services/aiOrchestrator');
 const {
   Project,
   ProjectRecommendation,
@@ -256,6 +257,13 @@ router.post('/recommendation', authenticate, authorize('MP'), async (req, res, n
       district: targetDistrict,
       cost: costNumber,
     });
+
+    // Trigger warm pre-sanction AI analysis so district review opens a warm result immediately
+    try {
+      await aiOrchestrator.analyzeProject(projectId, req.user);
+    } catch (analysisErr) {
+      logger.warn(`Warm pre-sanction AI analysis deferred for ${projectId}: ${analysisErr.message}`);
+    }
 
     return ApiResponse.created(
       res,
@@ -504,14 +512,7 @@ router.get(
     }
 
     // Concurrent gathering of all Review Package sub-resources
-    const [
-      recommendation,
-      decisions,
-      engineeringReports,
-      complianceFindings,
-      aiFlags,
-      currentRisk,
-    ] = await Promise.all([
+    const reviewResources = await Promise.all([
       ProjectRecommendation.findOne({ project_id: projectId }).lean(),
       OfficerDecision.find({ project_id: projectId }).sort({ decided_at: -1 }).lean(),
       EngineeringReport.find({ project_id: projectId }).sort({ version: -1 }).lean(),
@@ -519,6 +520,28 @@ router.get(
       AiRiskFlag.find({ project_id: projectId }).sort({ created_at: -1 }).lean(),
       AiRiskScore.findOne({ project_id: projectId }).lean(),
     ]);
+
+    const recommendation = reviewResources[0];
+    const decisions = reviewResources[1];
+    const engineeringReports = reviewResources[2];
+    const complianceFindings = reviewResources[3];
+    let aiFlags = reviewResources[4];
+    let currentRisk = reviewResources[5];
+
+    // Pre-sanction AI analysis trigger: if never evaluated, pending, or forced refresh
+    if ((!currentRisk || currentRisk.ai_status === 'AI_ANALYSIS_PENDING' || req.query.refresh === 'true') && req.user.role !== 'ADMIN') {
+      try {
+        await aiOrchestrator.analyzeProject(projectId, req.user);
+        const freshAi = await Promise.all([
+          AiRiskFlag.find({ project_id: projectId }).sort({ created_at: -1 }).lean(),
+          AiRiskScore.findOne({ project_id: projectId }).lean(),
+        ]);
+        aiFlags = freshAi[0];
+        currentRisk = freshAi[1];
+      } catch (analysisErr) {
+        logger.warn(`On-demand pre-sanction AI analysis deferred for ${projectId}: ${analysisErr.message}`);
+      }
+    }
 
     // 1. Compliance aggregation
     let complianceStatus = 'COMPLIANT';
@@ -532,12 +555,20 @@ router.get(
       }
     }
 
-    // 2. Historical & Duplicate signals
-    const duplicateFlags = aiFlags.filter((f) => f.flag_type === 'DUPLICATE_RISK');
+    // 2. Historical & Duplicate signals (support canonical names and microservice aliases)
+    const duplicateFlags = aiFlags.filter(
+      (f) => f.flag_type === 'DUPLICATE_RISK' || f.flag_type === 'DUPLICATE_OVERLAP'
+    );
     const costFlag = aiFlags.find((f) => f.flag_type === 'COST_ANOMALY');
-    const specFlag = aiFlags.find((f) => f.flag_type === 'SPECIFICATION_DEVIATION');
-    const delayFlag = aiFlags.find((f) => f.flag_type === 'DELAY_RISK');
-    const paymentFlag = aiFlags.find((f) => f.flag_type === 'PAYMENT_PROGRESS_ANOMALY');
+    const specFlag = aiFlags.find(
+      (f) => f.flag_type === 'SPECIFICATION_DEVIATION' || f.flag_type === 'SPEC_DEVIATION'
+    );
+    const delayFlag = aiFlags.find(
+      (f) => f.flag_type === 'DELAY_RISK' || f.flag_type === 'DELAY_STALENESS'
+    );
+    const paymentFlag = aiFlags.find(
+      (f) => f.flag_type === 'PAYMENT_PROGRESS_ANOMALY' || f.flag_type === 'PAYMENT_PROGRESS_MISMATCH'
+    );
 
     // 3. Cost benchmark payload
     const costBenchmark = {
@@ -594,6 +625,15 @@ router.get(
         'Advisory Only — Administrative Discretion Required per Rules §12. AI findings never replace human authority.',
     };
 
+    const significantDuplicateFlag = duplicateFlags.find(
+      (f) => f.severity === 'HIGH' || f.severity === 'MEDIUM' || (f.risk_score && f.risk_score >= 40)
+    );
+    const duplicateSummary = significantDuplicateFlag
+      ? (significantDuplicateFlag.explanation || `${duplicateFlags.length} potential historical match(es) evaluated.`)
+      : (duplicateFlags.length > 0 && duplicateFlags[0]?.explanation
+        ? duplicateFlags[0].explanation
+        : 'No significant historical overlap detected.');
+
     return ApiResponse.success(
       res,
       {
@@ -609,10 +649,7 @@ router.get(
         },
         historical: {
           duplicate_flags: duplicateFlags,
-          summary:
-            duplicateFlags.length > 0
-              ? `${duplicateFlags.length} potential historical match(es) evaluated.`
-              : 'No significant historical overlap detected.',
+          summary: duplicateSummary,
         },
         historical_duplicates: duplicateFlags,
         cost_benchmark: costBenchmark,

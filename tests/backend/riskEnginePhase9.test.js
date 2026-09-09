@@ -143,6 +143,7 @@ describe('Phase 9: Risk Engine, AI Gateway & Explainable AI Tests', () => {
       await mongoose.connection.collection('projects').deleteMany({ project_id: { $in: testPids } });
       await mongoose.connection.collection('project_recommendations').deleteMany({ project_id: { $in: testPids } });
       await mongoose.connection.collection('engineering_reports').deleteMany({ project_id: { $in: testPids } });
+      await mongoose.connection.collection('compliance_findings').deleteMany({ project_id: { $in: testPids } });
       await mongoose.connection.collection('project_progress').deleteMany({ project_id: { $in: testPids } });
       await mongoose.connection.collection('ai_risk_flags').deleteMany({ project_id: { $in: testPids } });
       await mongoose.connection.collection('ai_risk_scores').deleteMany({ project_id: { $in: testPids } });
@@ -156,14 +157,22 @@ describe('Phase 9: Risk Engine, AI Gateway & Explainable AI Tests', () => {
       await EngineeringReport.create({
         report_id: 'REP-P9-01',
         project_id: testProjectId,
+        agency_id: 'AG-PWD-IND-01',
+        submitted_by: 'AG-PWD-IND-01',
         detailed_estimate: 7000000,
         status: 'APPROVED',
       });
       await ComplianceFinding.create({
         finding_id: 'CMP-P9-01',
         project_id: testProjectId,
+        mp_id: mpId,
+        district: 'Indore',
+        state: 'Madhya Pradesh',
+        rule_id: 'RULE_ELIGIBILITY_CATEGORY',
+        rule_category: 'ELIGIBILITY',
+        title: 'Work Category Eligibility',
         severity: 'HIGH',
-        category: 'CATEGORY_INELIGIBLE',
+        status: 'REVIEW_REQUIRED',
         message: 'Work category requires verification.',
       });
     } else {
@@ -269,6 +278,8 @@ describe('Phase 9: Risk Engine, AI Gateway & Explainable AI Tests', () => {
   after(async () => {
     if (isDbConnected && mongoose.connection.readyState !== 0) {
       await mongoose.connection.collection('projects').deleteMany({ project_id: testProjectId });
+      await mongoose.connection.collection('engineering_reports').deleteMany({ project_id: testProjectId });
+      await mongoose.connection.collection('compliance_findings').deleteMany({ project_id: testProjectId });
       await mongoose.connection.collection('ai_risk_flags').deleteMany({ project_id: testProjectId });
       await mongoose.connection.collection('ai_risk_scores').deleteMany({ project_id: testProjectId });
       await mongoose.connection.collection('ai_analysis_history').deleteMany({ project_id: testProjectId });

@@ -18,6 +18,8 @@ export function DistrictReviewModal({ projectId, isOpen, onClose, onDecisionReco
   const [reviewData, setReviewData] = useState(null);
   const [error, setError] = useState(null);
   const [evidenceOpen, setEvidenceOpen] = useState(false);
+  const [analyzingRisk, setAnalyzingRisk] = useState(false);
+  const [riskActionMessage, setRiskActionMessage] = useState(null);
 
   // Decision Confirmation Modal State
   const [pendingDecision, setPendingDecision] = useState(null); // 'SANCTION' | 'HOLD' | 'REQUEST_CLARIFICATION' | 'ORDER_INSPECTION' | 'ESCALATE'
@@ -73,6 +75,29 @@ export function DistrictReviewModal({ projectId, isOpen, onClose, onDecisionReco
   const risk = reviewData?.risk || {};
   const aiRecommendation = reviewData?.ai_recommendation || {};
   const decisions = reviewData?.decisions || [];
+
+  // Synchronously trigger AI risk re-evaluation and refresh review data
+  const handleReevaluateRisk = async () => {
+    if (!projectId || analyzingRisk) return;
+    setAnalyzingRisk(true);
+    setRiskActionMessage(null);
+    try {
+      const res = await authFetch(`/api/projects/${projectId}/risk/analyze`, {
+        method: 'POST',
+      });
+      const body = await res.json();
+      if (!res.ok || !body.success) {
+        throw new Error(body.error?.message || 'Failed to re-evaluate AI risk');
+      }
+      await fetchReviewPackage();
+      setRiskActionMessage({ type: 'success', text: 'AI Risk re-evaluation completed successfully.' });
+      setTimeout(() => setRiskActionMessage(null), 5000);
+    } catch (err) {
+      setRiskActionMessage({ type: 'error', text: err.message || 'Failed to re-evaluate AI risk' });
+    } finally {
+      setAnalyzingRisk(false);
+    }
+  };
 
   // Open confirmation modal for selected action
   const handleInitiateDecision = (decisionType) => {
@@ -390,29 +415,87 @@ export function DistrictReviewModal({ projectId, isOpen, onClose, onDecisionReco
                 }}
               >
                 <div style={{ fontSize: '12px', fontWeight: 700, color: 'var(--color-secondary)', textTransform: 'uppercase', marginBottom: '4px' }}>
-                  Historical Intelligence & Duplicate Checks (Phase 8 TF-IDF Cosine Match)
                   Historical Duplicates & Overlap Detection (Phase 8 TF-IDF Cosine Match)
                 </div>
                 {historical.duplicate_flags && historical.duplicate_flags.length > 0 ? (
                   <div style={{ display: 'flex', flexDirection: 'column', gap: '8px', marginTop: '8px' }}>
-                    {historical.duplicate_flags.map((flag, idx) => (
-                      <div
-                        key={idx}
-                        style={{
-                          padding: '8px 12px',
-                          backgroundColor: '#FFF8E6',
-                          border: '1px solid #F2DC9B',
-                          borderRadius: '4px',
-                          fontSize: '12px',
-                        }}
-                      >
-                        <div style={{ display: 'flex', justifyContent: 'space-between', fontWeight: 600, color: '#8A6100', marginBottom: '4px' }}>
-                          <span>Duplicate Signal: {flag.severity}</span>
-                          <span>Score: {flag.risk_score}/100</span>
+                    {historical.duplicate_flags.map((flag, idx) => {
+                      const topMatches = flag.evidence?.top_matches || flag.signals?.top_matches || [];
+                      return (
+                        <div
+                          key={idx}
+                          style={{
+                            padding: '10px 12px',
+                            backgroundColor: '#FFF8E6',
+                            border: '1px solid #F2DC9B',
+                            borderRadius: '4px',
+                            fontSize: '12px',
+                          }}
+                        >
+                          <div style={{ display: 'flex', justifyContent: 'space-between', fontWeight: 600, color: '#8A6100', marginBottom: '4px' }}>
+                            <span>Duplicate Signal: {flag.severity}</span>
+                            <span>Score: {flag.risk_score}/100</span>
+                          </div>
+                          <div>{flag.explanation}</div>
+
+                          {topMatches && topMatches.length > 0 && (
+                            <div style={{ marginTop: '10px', overflowX: 'auto' }}>
+                              <div style={{ fontSize: '11px', fontWeight: 700, color: '#664D00', marginBottom: '6px', textTransform: 'uppercase', letterSpacing: '0.04em' }}>
+                                Potential Duplicate Match Candidates ({topMatches.length})
+                              </div>
+                              <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: '11px', backgroundColor: '#FFFFFF', borderRadius: '4px', overflow: 'hidden', border: '1px solid #E2D9C8' }}>
+                                <thead>
+                                  <tr style={{ backgroundColor: '#FBF5E8', color: '#5A4A28', borderBottom: '1px solid #E2D9C8', textAlign: 'left' }}>
+                                    <th style={{ padding: '6px 8px' }}>Candidate Project</th>
+                                    <th style={{ padding: '6px 8px' }}>Category</th>
+                                    <th style={{ padding: '6px 8px' }}>Location / Ward</th>
+                                    <th style={{ padding: '6px 8px' }}>Status</th>
+                                    <th style={{ padding: '6px 8px', textAlign: 'right' }}>Similarity Match</th>
+                                  </tr>
+                                </thead>
+                                <tbody>
+                                  {topMatches.map((m, mIdx) => {
+                                    const simScore = m.similarity_score !== undefined ? m.similarity_score : Math.round((m.score || 0) * 100);
+                                    const badgeBg = simScore >= 70 ? '#FDE8E8' : simScore >= 45 ? '#FEF08A' : '#F1F5F9';
+                                    const badgeColor = simScore >= 70 ? '#9B1C1C' : simScore >= 45 ? '#854D0E' : '#475569';
+                                    return (
+                                      <tr key={mIdx} style={{ borderBottom: mIdx < topMatches.length - 1 ? '1px solid #F3EDE0' : 'none' }}>
+                                        <td style={{ padding: '6px 8px' }}>
+                                          <span style={{ fontWeight: 600, color: 'var(--color-primary)' }}>{m.project_id}</span>
+                                          <div style={{ fontSize: '11px', color: 'var(--color-text)', marginTop: '2px' }}>{m.title}</div>
+                                        </td>
+                                        <td style={{ padding: '6px 8px', color: 'var(--color-text)' }}>{m.category || '—'}</td>
+                                        <td style={{ padding: '6px 8px', color: 'var(--color-text)' }}>{m.ward ? `Ward ${m.ward}` : (m.location || m.district || '—')}</td>
+                                        <td style={{ padding: '6px 8px' }}>
+                                          <span style={{ fontSize: '10px', padding: '2px 5px', borderRadius: '3px', backgroundColor: '#E2E8F0', color: '#334155', fontWeight: 600 }}>
+                                            {m.status || 'UNKNOWN'}
+                                          </span>
+                                        </td>
+                                        <td style={{ padding: '6px 8px', textAlign: 'right' }}>
+                                          <span
+                                            style={{
+                                              display: 'inline-block',
+                                              padding: '2px 7px',
+                                              borderRadius: '10px',
+                                              fontSize: '11px',
+                                              fontWeight: 700,
+                                              backgroundColor: badgeBg,
+                                              color: badgeColor,
+                                            }}
+                                          >
+                                            {simScore}% match
+                                          </span>
+                                        </td>
+                                      </tr>
+                                    );
+                                  })}
+                                </tbody>
+                              </table>
+                            </div>
+                          )}
                         </div>
-                        <div>{flag.explanation}</div>
-                      </div>
-                    ))}
+                      );
+                    })}
                   </div>
                 ) : (
                   <div style={{ padding: '8px 12px', backgroundColor: '#F8FAFC', borderRadius: '4px', fontSize: '12px', color: 'var(--color-muted)' }}>
@@ -528,19 +611,70 @@ export function DistrictReviewModal({ projectId, isOpen, onClose, onDecisionReco
               >
                 <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '10px' }}>
                   <div style={{ fontSize: '12px', fontWeight: 700, color: 'var(--color-secondary)', textTransform: 'uppercase' }}>
-                    Combined AI Risk Assessment (Phase 9 Explainable Risk Engine)
                     AI Composite Risk Assessment (Phase 9 Explainable Risk Engine)
                   </div>
-                  <RiskBadge level={risk.risk_level} score={risk.overall_score} />
+                  <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+                    <RiskBadge level={risk.risk_level} score={risk.overall_score} />
+                    <Button
+                      variant="outline"
+                      size="sm"
+                      onClick={handleReevaluateRisk}
+                      loading={analyzingRisk}
+                      disabled={analyzingRisk}
+                      style={{ fontSize: '11px', padding: '2px 8px', height: '26px' }}
+                    >
+                      {analyzingRisk ? 'Analyzing...' : '↻ Re-evaluate AI Risk'}
+                    </Button>
+                  </div>
                 </div>
+
+                {riskActionMessage && (
+                  <div
+                    style={{
+                      padding: '8px 12px',
+                      borderRadius: '4px',
+                      fontSize: '12px',
+                      marginBottom: '10px',
+                      backgroundColor: riskActionMessage.type === 'success' ? '#DEF7EC' : '#FDE8E8',
+                      color: riskActionMessage.type === 'success' ? '#03543F' : '#9B1C1C',
+                      border: `1px solid ${riskActionMessage.type === 'success' ? '#31C48D' : '#F98080'}`,
+                    }}
+                  >
+                    {riskActionMessage.text}
+                  </div>
+                )}
+
                 {risk.overall_score !== null && risk.overall_score !== undefined ? (
                   <RiskBreakdown
                     componentScores={risk.component_scores}
                     topContributors={risk.top_contributors}
+                    contributors={risk.top_contributors}
                   />
                 ) : (
-                  <div style={{ fontSize: '12px', color: 'var(--color-muted)', padding: '8px', backgroundColor: '#F8FAFC', borderRadius: '4px' }}>
-                    AI analysis pending or unavailable. Showing baseline structured telemetry.
+                  <div
+                    style={{
+                      fontSize: '12px',
+                      color: 'var(--color-muted)',
+                      padding: '10px 12px',
+                      backgroundColor: '#F8FAFC',
+                      borderRadius: '4px',
+                      display: 'flex',
+                      justifyContent: 'space-between',
+                      alignItems: 'center',
+                      gap: '12px',
+                    }}
+                  >
+                    <span>AI analysis pending or unavailable. Showing baseline structured telemetry.</span>
+                    <Button
+                      variant="primary"
+                      size="sm"
+                      onClick={handleReevaluateRisk}
+                      loading={analyzingRisk}
+                      disabled={analyzingRisk}
+                      style={{ fontSize: '11px', padding: '4px 10px' }}
+                    >
+                      {analyzingRisk ? 'Evaluating...' : 'Run AI Analysis Now'}
+                    </Button>
                   </div>
                 )}
               </div>

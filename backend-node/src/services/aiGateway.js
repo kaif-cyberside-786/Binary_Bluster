@@ -57,6 +57,7 @@ class AiGateway {
       evidence,
       provider,
       model: config.geminiModel,
+      api_key: config.geminiApiKey || '',
     };
 
     try {
@@ -66,6 +67,19 @@ class AiGateway {
         logger.warn('AI Gateway explanation unavailable from microservice, falling back to rule-based copy', {
           code: response.code,
         });
+
+        // If mock provider is configured, provide mock advisory narrative even if microservice is offline
+        if (provider === 'mock') {
+          return {
+            status: 'AI_ANALYSIS_COMPLETE',
+            explanation:
+              `[Mock LLM Advisory]\n` +
+              this.buildRuleBasedExplanation(overallScore, riskLevel, topContributors),
+            provider: 'mock',
+            model: 'mock-model',
+            data_minimized: true,
+          };
+        }
 
         return {
           status: 'AI_ANALYSIS_UNAVAILABLE',

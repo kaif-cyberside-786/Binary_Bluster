@@ -13,8 +13,8 @@ from typing import Dict, Any, Tuple
 logger = logging.getLogger("mplads.gateway.gemini")
 
 GEMINI_API_KEY_ENV = "GEMINI_API_KEY"
-DEFAULT_MODEL = "gemini-1.5-flash"
-DEFAULT_TIMEOUT_SEC = 5.0
+DEFAULT_MODEL = "gemini-2.5-flash"
+DEFAULT_TIMEOUT_SEC = 8.0
 
 SYSTEM_INSTRUCTION = (
     "You are an AI decision-support assistant for the Member of Parliament Local Area Development Scheme (MPLADS) in India. "
@@ -44,7 +44,7 @@ def _build_deterministic_fallback(overall_score: int, risk_level: str, top_contr
 
 class GeminiAdapter:
     def __init__(self, api_key: str = None, model: str = None, timeout_sec: float = DEFAULT_TIMEOUT_SEC):
-        self.api_key = api_key or os.getenv(GEMINI_API_KEY_ENV, "").strip()
+        self.api_key = api_key.strip() if api_key is not None else os.getenv(GEMINI_API_KEY_ENV, "").strip()
         self.model = model or os.getenv("GEMINI_MODEL", DEFAULT_MODEL)
         self.timeout_sec = timeout_sec
 
@@ -111,7 +111,10 @@ class GeminiAdapter:
             ],
             "generationConfig": {
                 "temperature": 0.2,
-                "maxOutputTokens": 300,
+                "maxOutputTokens": 1024,
+                "thinkingConfig": {
+                    "thinkingBudget": 0
+                },
             },
         }
 
@@ -123,7 +126,23 @@ class GeminiAdapter:
                 method="POST",
             )
 
-            with urllib.request.urlopen(req, timeout=self.timeout_sec) as response:
+            try:
+                response = urllib.request.urlopen(req, timeout=self.timeout_sec)
+            except urllib.error.HTTPError as http_err:
+                # If thinkingConfig caused 400 on an older model, retry without thinkingConfig
+                if http_err.code == 400 and "thinkingConfig" in request_body.get("generationConfig", {}):
+                    request_body["generationConfig"].pop("thinkingConfig", None)
+                    req = urllib.request.Request(
+                        url,
+                        data=json.dumps(request_body).encode("utf-8"),
+                        headers={"Content-Type": "application/json"},
+                        method="POST",
+                    )
+                    response = urllib.request.urlopen(req, timeout=self.timeout_sec)
+                else:
+                    raise http_err
+
+            with response:
                 if response.status != 200:
                     logger.warning(f"Gemini returned HTTP {response.status}")
                     return (

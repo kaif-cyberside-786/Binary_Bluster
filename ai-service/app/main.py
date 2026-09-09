@@ -3,8 +3,35 @@ FastAPI Entry Point for MPLADS AI Analytics Service
 Stateless analytical and ML microservice invoked solely by Express backend.
 Complies with architecture.md §4, §13, and rules.md §4, §12.
 """
+import os
+from pathlib import Path
 from fastapi import FastAPI, HTTPException
 from fastapi.middleware.cors import CORSMiddleware
+
+
+def _load_env_files():
+    """Load key-value pairs from .env files if not already in os.environ."""
+    candidates = [
+        Path(__file__).resolve().parent.parent / ".env",
+        Path(__file__).resolve().parent.parent.parent / "backend-node" / ".env",
+        Path(__file__).resolve().parent.parent.parent / ".env",
+    ]
+    for env_path in candidates:
+        if env_path.is_file():
+            try:
+                with open(env_path, "r", encoding="utf-8") as f:
+                    for line in f:
+                        line = line.strip()
+                        if line and not line.startswith("#") and "=" in line:
+                            k, v = line.split("=", 1)
+                            k, v = k.strip(), v.strip().strip("'\"")
+                            if k and k not in os.environ:
+                                os.environ[k] = v
+            except Exception:
+                pass
+
+
+_load_env_files()
 from app.schemas import (
     SignalResponse,
     CostAnomalyRequest,
@@ -99,6 +126,7 @@ def explain_endpoint(req: ExplanationRequest):
             evidence=req.evidence,
             provider=req.provider,
             model=req.model,
+            api_key=req.api_key,
         )
         return ExplanationResponse(**res)
     except Exception as e:

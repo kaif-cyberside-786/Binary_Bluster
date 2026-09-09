@@ -48,13 +48,14 @@ class AiOrchestrator {
     const latestProgress = progressHistory.length > 0 ? progressHistory[0] : null;
 
     // 2. Query in-jurisdiction peer works for cost benchmark (AI-01)
+    const peerDistrict = (project.district || '').trim();
     const peerQuery = {
       project_id: { $ne: pId },
       category: project.category,
       state: project.state,
     };
-    if (project.district) {
-      peerQuery.district = project.district;
+    if (peerDistrict) {
+      peerQuery.district = { $regex: new RegExp(`^${peerDistrict}$`, 'i') };
     }
 
     const peerProjects = await Project.find(peerQuery)
@@ -67,12 +68,39 @@ class AiOrchestrator {
       .filter((c) => typeof c === 'number' && c > 0);
 
     // 3. Query candidate projects for duplicate detection (AI-02)
-    const candidateProjects = await Project.find({
+    // Corpus MUST include other projects in the same district/jurisdiction across all lifecycle stages:
+    // DISTRICT_REVIEW, CLARIFICATION_REQUIRED, HELD, SANCTIONED, IN_PROGRESS, COMPLETED
+    const candidateDistrict = (project.district || '').trim();
+    const candidateQuery = {
       project_id: { $ne: pId },
-      district: project.district,
-    })
-      .select('project_id title description category district location ward block status sanctioned_cost')
-      .limit(30)
+    };
+
+    if (candidateDistrict) {
+      candidateQuery.district = { $regex: new RegExp(`^${candidateDistrict}$`, 'i') };
+    } else if (project.state && project.state.trim()) {
+      candidateQuery.state = { $regex: new RegExp(`^${project.state.trim()}$`, 'i') };
+    }
+
+    // Include pre-sanction and active/completed projects; exclude only self
+    candidateQuery.status = {
+      $in: [
+        'SUBMITTED',
+        'DISTRICT_REVIEW',
+        'CLARIFICATION_REQUIRED',
+        'CLARIFICATION_REQUESTED',
+        'HELD',
+        'SANCTIONED',
+        'TECHNICAL_SANCTION_PENDING',
+        'INSPECTION_REQUESTED',
+        'IN_PROGRESS',
+        'COMPLETED',
+      ],
+    };
+
+    const candidateProjects = await Project.find(candidateQuery)
+      .select('project_id title description category district location ward block status sanctioned_cost estimated_cost')
+      .sort({ updated_at: -1, created_at: -1 })
+      .limit(100)
       .lean();
 
     // 4. Compute temporal features for delay check (AI-04)
@@ -103,17 +131,22 @@ class AiOrchestrator {
       state: project.state,
     };
 
+    const targetLocation = typeof project.location === 'string' ? project.location : '';
+    const targetWard = project.ward || recommendation?.location?.village_ward || '';
+    const targetBlock = project.block || recommendation?.location?.block || '';
+
     const duplicatePayload = {
       target_project: {
         project_id: project.project_id,
         title: project.title,
         description: project.description || recommendation?.description || '',
-        category: project.category || '',
+        category: project.category || recommendation?.work_category || '',
         district: project.district || '',
-        location: project.location || '',
-        ward: project.ward || '',
-        block: project.block || '',
+        location: targetLocation || targetWard || '',
+        ward: targetWard || '',
+        block: targetBlock || '',
         status: project.status,
+        sanctioned_cost: project.sanctioned_cost || project.estimated_cost || recommendation?.estimated_cost || null,
       },
       candidate_projects: candidateProjects.map((c) => ({
         project_id: c.project_id,
@@ -121,11 +154,11 @@ class AiOrchestrator {
         description: c.description || '',
         category: c.category || '',
         district: c.district || '',
-        location: c.location || '',
+        location: (typeof c.location === 'string' ? c.location : '') || c.ward || '',
         ward: c.ward || '',
         block: c.block || '',
         status: c.status || '',
-        sanctioned_cost: c.sanctioned_cost || null,
+        sanctioned_cost: c.sanctioned_cost || c.estimated_cost || null,
       })),
       similarity_threshold: 0.30,
     };

@@ -62,9 +62,19 @@ const config = {
   aiServiceUrl: process.env.AI_SERVICE_URL || 'http://localhost:8000',
   aiServiceTimeoutMs: parseInt(process.env.AI_SERVICE_TIMEOUT_MS, 10) || 5000,
   geminiApiKey: process.env.GEMINI_API_KEY || '',
-  geminiModel: process.env.GEMINI_MODEL || 'gemini-1.5-flash',
-  aiGatewayProvider: process.env.AI_GATEWAY_PROVIDER || 'gemini',
+  geminiModel: process.env.GEMINI_MODEL || 'gemini-2.5-flash',
+  aiGatewayProvider:
+    process.env.AI_PROVIDER ||
+    process.env.AI_GATEWAY_PROVIDER ||
+    (process.env.GEMINI_API_KEY &&
+    process.env.GEMINI_API_KEY !== 'your_gemini_api_key_placeholder'
+      ? 'gemini'
+      : process.env.NODE_ENV === 'development'
+        ? 'mock'
+        : 'gemini'),
   aiGatewayTimeoutMs: parseInt(process.env.AI_GATEWAY_TIMEOUT_MS, 10) || 8000,
+  ollamaBaseUrl: process.env.OLLAMA_BASE_URL || 'http://localhost:11434',
+  ollamaModel: process.env.OLLAMA_MODEL || 'llama3',
 };
 
 module.exports = config;
