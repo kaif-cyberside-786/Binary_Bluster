@@ -1,6 +1,6 @@
 import React, { useState, useEffect, useCallback } from 'react';
 import { useNavigate, useLocation } from 'react-router-dom';
-import { useAuth } from '../context/AuthContext';
+import { useAuth, getWorkspacePath } from '../context/AuthContext';
 import Button from '../components/Button';
 import Card from '../components/Card';
 
@@ -36,27 +36,6 @@ export function LoginPage() {
       navigate(destination, { replace: true });
     }
   }, [isAuthenticated, user, navigate, location]);
-
-  const getWorkspacePath = (role) => {
-    switch (role) {
-      case 'MP':
-        return '/mp';
-      case 'DISTRICT_AUTHORITY':
-        return '/district';
-      case 'IMPLEMENTING_AGENCY':
-        return '/agency';
-      case 'STATE_NODAL_OFFICER':
-        return '/state';
-      case 'MINISTRY_OFFICER':
-        return '/ministry';
-      case 'AUDITOR':
-        return '/auditor';
-      case 'ADMIN':
-        return '/admin';
-      default:
-        return '/';
-    }
-  };
 
   // Fetch CAPTCHA challenge from backend
   const fetchCaptcha = useCallback(async () => {

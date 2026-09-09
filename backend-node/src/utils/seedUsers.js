@@ -10,7 +10,7 @@ const DEFAULT_USERS = [
   {
     user_id: 'ADMIN001',
     official_email: 'admin@mplads.gov.in',
-    password: 'Admin@12345',
+    password: 'Demo@12345',
     full_name: 'Platform System Administrator',
     role: 'ADMIN',
     designation: 'Senior Technical Director (NIC/MoSPI)',
@@ -20,7 +20,7 @@ const DEFAULT_USERS = [
   {
     user_id: 'MP-IND-01',
     official_email: 'mp.indore@sansad.nic.in',
-    password: 'MpPass@12345',
+    password: 'Demo@12345',
     full_name: 'Hon. Member of Parliament (Indore)',
     role: 'MP',
     designation: 'Member of Parliament (Lok Sabha)',
@@ -34,7 +34,7 @@ const DEFAULT_USERS = [
   {
     user_id: 'DA-IND-01',
     official_email: 'collector.indore@mp.gov.in',
-    password: 'Collector@12345',
+    password: 'Demo@12345',
     full_name: 'District Collector & Magistrate',
     role: 'DISTRICT_AUTHORITY',
     designation: 'District Collector',
@@ -48,7 +48,7 @@ const DEFAULT_USERS = [
   {
     user_id: 'AG-PWD-01',
     official_email: 'ee.pwd.indore@mp.gov.in',
-    password: 'Agency@12345',
+    password: 'Demo@12345',
     full_name: 'Executive Engineer (PWD Division 1)',
     role: 'IMPLEMENTING_AGENCY',
     designation: 'Executive Engineer',
@@ -63,7 +63,7 @@ const DEFAULT_USERS = [
   {
     user_id: 'SA-MP-01',
     official_email: 'sna.mplads@mp.gov.in',
-    password: 'StatePassword@123',
+    password: 'Demo@12345',
     full_name: 'State Nodal Officer (MPLADS Cell)',
     role: 'STATE_NODAL_AUTHORITY',
     designation: 'Joint Secretary (Planning)',
@@ -76,7 +76,7 @@ const DEFAULT_USERS = [
   {
     user_id: 'MIN-DIID-01',
     official_email: 'diid.director@mospi.gov.in',
-    password: 'MinistryPassword@123',
+    password: 'Demo@12345',
     full_name: 'Director (DIID, MoSPI)',
     role: 'MINISTRY',
     designation: 'Director (Data Informatics & Innovation)',
@@ -86,7 +86,7 @@ const DEFAULT_USERS = [
   {
     user_id: 'AUD-CAG-01',
     official_email: 'sr.auditor@cag.gov.in',
-    password: 'AuditorPassword@123',
+    password: 'Demo@12345',
     full_name: 'Senior Audit Officer (Central Audit)',
     role: 'AUDITOR',
     designation: 'Senior Audit Officer',
@@ -112,6 +112,8 @@ async function seedDefaultUsers() {
           phone: u.phone,
           jurisdiction: u.jurisdiction,
           is_active: true,
+          failed_login_attempts: 0,
+          lockout_until: null,
         });
         await user.save();
         logger.info(`Seeded user account: ${u.user_id} (${u.role})`);
@@ -119,6 +121,8 @@ async function seedDefaultUsers() {
         // Ensure specified test credentials and jurisdiction remain synchronized
         existing.password_hash = password_hash;
         existing.is_active = true;
+        existing.failed_login_attempts = 0;
+        existing.lockout_until = null;
         existing.jurisdiction = u.jurisdiction;
         await existing.save();
       }

@@ -1,6 +1,6 @@
 import React from 'react';
 import { Link, useNavigate } from 'react-router-dom';
-import { useAuth } from '../context/AuthContext';
+import { useAuth, getWorkspacePath } from '../context/AuthContext';
 import { Button } from './Button';
 
 /**
@@ -12,27 +12,6 @@ import { Button } from './Button';
 export function Header({ activeView = 'landing', onViewChange }) {
   const { user, isAuthenticated, logout } = useAuth();
   const navigate = useNavigate();
-
-  const getWorkspacePath = (role) => {
-    switch (role) {
-      case 'MP':
-        return '/mp';
-      case 'DISTRICT_AUTHORITY':
-        return '/district';
-      case 'IMPLEMENTING_AGENCY':
-        return '/agency';
-      case 'STATE_NODAL_OFFICER':
-        return '/state';
-      case 'MINISTRY_OFFICER':
-        return '/ministry';
-      case 'AUDITOR':
-        return '/auditor';
-      case 'ADMIN':
-        return '/admin';
-      default:
-        return '/';
-    }
-  };
 
   const handleSignOut = async () => {
     await logout();
@@ -78,7 +57,7 @@ export function Header({ activeView = 'landing', onViewChange }) {
         >
           {/* Project Title & Ministry Sub-brand */}
           <div>
-            <Link to="/" style={{ textDecoration: 'none', color: 'inherit' }}>
+            <Link to={isAuthenticated && user?.role ? getWorkspacePath(user.role) : "/"} style={{ textDecoration: 'none', color: 'inherit' }}>
               <div
                 style={{
                   fontSize: '11px',
@@ -118,7 +97,7 @@ export function Header({ activeView = 'landing', onViewChange }) {
                 type="button"
                 onClick={() => {
                   if (onViewChange) onViewChange('landing');
-                  navigate('/');
+                  navigate(isAuthenticated ? '/?view=public' : '/');
                 }}
                 style={{
                   padding: '6px 12px',

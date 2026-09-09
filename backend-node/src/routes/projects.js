@@ -13,6 +13,7 @@ const fs = require('fs');
 const { withTransaction } = require('../utils/transaction');
 const { handleDocumentUpload, computeFileHash } = require('../middleware/upload');
 const aiOrchestrator = require('../services/aiOrchestrator');
+const executionMonitoringService = require('../services/executionMonitoringService');
 const {
   Project,
   ProjectRecommendation,
@@ -372,6 +373,131 @@ router.get('/', authenticate, async (req, res, next) => {
     next(err);
   }
 });
+
+/**
+ * GET /api/projects/monitoring/active
+ * Retrieve continuous execution monitoring queue for active works in jurisdiction
+ * Protected: DISTRICT_AUTHORITY, STATE_NODAL_AUTHORITY, MINISTRY, AUDITOR (Admin Isolation enforced)
+ */
+router.get(
+  '/monitoring/active',
+  authenticate,
+  authorize('DISTRICT_AUTHORITY', 'STATE_NODAL_AUTHORITY', 'MINISTRY', 'AUDITOR', 'ADMIN'),
+  async (req, res, next) => {
+    try {
+      const { role, jurisdiction } = req.user;
+
+      if (role === 'ADMIN') {
+        return ApiResponse.forbidden(
+          res,
+          'Access denied: Admin isolation prohibits administrative accounts from accessing project monitoring data per rules.md §10',
+          'ADMIN_ISOLATION'
+        );
+      }
+
+      const query = {
+        status: {
+          $in: [
+            'SANCTIONED',
+            'IN_PROGRESS',
+            'TECHNICAL_SANCTION_PENDING',
+            'INSPECTION_REQUESTED',
+            'HELD',
+          ],
+        },
+      };
+
+      if (role === 'DISTRICT_AUTHORITY') {
+        const dist = jurisdiction?.district;
+        if (dist) query.district = new RegExp(`^${dist}$`, 'i');
+      } else if (role === 'STATE_NODAL_AUTHORITY') {
+        const st = jurisdiction?.state;
+        if (st) query.state = new RegExp(`^${st}$`, 'i');
+      }
+
+      if (req.query.category) query.category = req.query.category;
+      if (req.query.status) query.status = req.query.status.toUpperCase();
+
+      const projects = await Project.find(query).sort({ updated_at: -1, created_at: -1 }).limit(100).lean();
+
+      // Gather latest progress, payments, and risk scores for active works
+      const projectIds = projects.map((p) => p.project_id);
+      const [allProgress, allPayments, allRiskScores] = await Promise.all([
+        ProjectProgress.find({ project_id: { $in: projectIds } }).sort({ reported_at: -1 }).lean(),
+        ProjectPayment.find({ project_id: { $in: projectIds }, status: { $in: ['DISBURSED', 'APPROVED'] } }).lean(),
+        AiRiskScore.find({ project_id: { $in: projectIds } }).lean(),
+      ]);
+
+      const progressByProject = new Map();
+      allProgress.forEach((pr) => {
+        if (!progressByProject.has(pr.project_id)) progressByProject.set(pr.project_id, pr);
+      });
+
+      const paymentsByProject = new Map();
+      allPayments.forEach((py) => {
+        const current = paymentsByProject.get(py.project_id) || 0;
+        paymentsByProject.set(py.project_id, current + (Number(py.amount) || 0));
+      });
+
+      const riskByProject = new Map();
+      allRiskScores.forEach((r) => {
+        riskByProject.set(r.project_id, r);
+      });
+
+      const now = Date.now();
+      let queue = projects.map((p) => {
+        const latestProg = progressByProject.get(p.project_id);
+        const totalDisbursed = paymentsByProject.get(p.project_id) || 0;
+        const sanctionedCost = Number(p.sanctioned_cost || p.estimated_cost || 0);
+        const finPct = sanctionedCost > 0 ? Number(((totalDisbursed / sanctionedCost) * 100).toFixed(1)) : 0.0;
+        const physPct = latestProg ? Number(latestProg.percent_complete) : 0.0;
+        const gap = Number((finPct - physPct).toFixed(1));
+        const risk = riskByProject.get(p.project_id);
+
+        let daysSinceLastProg = null;
+        if (latestProg?.reported_at) {
+          daysSinceLastProg = Math.max(0, Math.floor((now - new Date(latestProg.reported_at).getTime()) / (1000 * 60 * 60 * 24)));
+        } else if (p.sanction_date) {
+          daysSinceLastProg = Math.max(0, Math.floor((now - new Date(p.sanction_date).getTime()) / (1000 * 60 * 60 * 24)));
+        }
+
+        const isMismatched = gap >= 15.0 || gap <= -25.0;
+        const isStalled = daysSinceLastProg !== null && daysSinceLastProg >= 60 && physPct < 100;
+
+        return {
+          project_id: p.project_id,
+          title: p.title,
+          status: p.status,
+          category: p.category,
+          district: p.district,
+          state: p.state,
+          sanctioned_cost: sanctionedCost,
+          total_disbursed: totalDisbursed,
+          financial_disbursed_percent: finPct,
+          physical_progress_percent: physPct,
+          discrepancy_gap_percent: gap,
+          is_mismatched: isMismatched,
+          days_since_last_progress: daysSinceLastProg,
+          is_stalled: isStalled,
+          stage: latestProg?.stage || 'NOT_STARTED',
+          risk_level: risk?.risk_level || 'LOW',
+          overall_score: risk?.overall_score ?? null,
+        };
+      });
+
+      if (req.query.mismatched_only === 'true') {
+        queue = queue.filter((item) => item.is_mismatched);
+      }
+      if (req.query.stalled_only === 'true') {
+        queue = queue.filter((item) => item.is_stalled);
+      }
+
+      return ApiResponse.success(res, queue, 'Active execution monitoring queue retrieved successfully');
+    } catch (err) {
+      next(err);
+    }
+  }
+);
 
 /**
  * GET /api/projects/:projectId
@@ -1238,7 +1364,29 @@ router.post(
         timestamp: new Date(),
       });
 
-      return ApiResponse.created(res, progress, 'Physical progress update recorded successfully');
+      // Phase 11: Continuous Execution Monitoring evaluation
+      let monitoringReport = null;
+      try {
+        monitoringReport = await executionMonitoringService.evaluateProjectExecution(projectId, req.user);
+      } catch (monErr) {
+        logger.warn(`Execution monitoring evaluation deferred for ${projectId}: ${monErr.message}`);
+      }
+
+      const responsePayload = progress.toObject ? progress.toObject() : { ...progress };
+      if (monitoringReport) {
+        responsePayload.monitoring = {
+          mismatch_severity: monitoringReport.execution_metrics?.mismatch_severity,
+          discrepancy_gap_percent: monitoringReport.execution_metrics?.discrepancy_gap_percent,
+          is_mismatched: monitoringReport.execution_metrics?.is_mismatched,
+          is_delayed: monitoringReport.execution_metrics?.timeline?.is_delayed,
+          has_abnormal_jump: monitoringReport.execution_metrics?.progress_jumps?.has_abnormal_jump,
+          advisory_action: monitoringReport.advisory_recommendation?.action,
+          advisory_text: monitoringReport.advisory_recommendation?.text,
+          risk: monitoringReport.risk,
+        };
+      }
+
+      return ApiResponse.created(res, responsePayload, 'Physical progress update recorded successfully');
     } catch (err) {
       next(err);
     }
@@ -1501,9 +1649,29 @@ router.patch(
 
       logger.info(`Payment ${paymentId} on project ${projectId} updated: ${prevStatus} -> ${status} by ${req.user.user_id}`);
 
+      // Phase 11: Trigger execution monitoring evaluation upon disbursement/approval
+      let monitoringReport = null;
+      if (status === 'DISBURSED' || status === 'APPROVED') {
+        try {
+          monitoringReport = await executionMonitoringService.evaluateProjectExecution(projectId, req.user);
+        } catch (monErr) {
+          logger.warn(`Execution monitoring deferred after payment ${paymentId}: ${monErr.message}`);
+        }
+      }
+
+      const responseData = payment.toObject ? payment.toObject() : { ...payment };
+      if (monitoringReport) {
+        responseData.monitoring = {
+          mismatch_severity: monitoringReport.execution_metrics?.mismatch_severity,
+          discrepancy_gap_percent: monitoringReport.execution_metrics?.discrepancy_gap_percent,
+          is_mismatched: monitoringReport.execution_metrics?.is_mismatched,
+          advisory_action: monitoringReport.advisory_recommendation?.action,
+        };
+      }
+
       return ApiResponse.success(
         res,
-        payment,
+        responseData,
         `Payment status updated to '${status}' successfully`
       );
     } catch (err) {
@@ -1735,6 +1903,87 @@ router.get('/:projectId/documents', authenticate, async (req, res, next) => {
     next(err);
   }
 });
+
+/**
+ * GET /api/projects/:projectId/monitoring
+ * Complete continuous execution monitoring telemetry
+ * Protected: DISTRICT_AUTHORITY, STATE_NODAL_AUTHORITY, MINISTRY, IMPLEMENTING_AGENCY, AUDITOR, MP (Admin Isolation enforced)
+ */
+router.get(
+  '/:projectId/monitoring',
+  authenticate,
+  authorize('DISTRICT_AUTHORITY', 'STATE_NODAL_AUTHORITY', 'MINISTRY', 'IMPLEMENTING_AGENCY', 'AUDITOR', 'MP', 'ADMIN'),
+  async (req, res, next) => {
+    try {
+      const { role } = req.user;
+      const projectId = req.params.projectId.trim().toUpperCase();
+
+      // Admin Isolation enforcement (rules.md §10)
+      if (role === 'ADMIN') {
+        return ApiResponse.forbidden(
+          res,
+          'Access denied: Admin isolation prohibits administrative accounts from accessing project monitoring data per rules.md §10',
+          'ADMIN_ISOLATION'
+        );
+      }
+
+      const project = await Project.findOne({ project_id: projectId }).lean();
+      if (!project) {
+        return ApiResponse.notFound(res, `Project '${projectId}' not found`);
+      }
+
+      const access = await checkProjectAccess(project, req.user);
+      if (!access.allowed) {
+        return ApiResponse.forbidden(res, access.message, access.code);
+      }
+
+      const telemetry = await executionMonitoringService.evaluateProjectExecution(projectId, req.user);
+      return ApiResponse.success(res, telemetry, 'Continuous execution monitoring telemetry retrieved successfully');
+    } catch (err) {
+      next(err);
+    }
+  }
+);
+
+/**
+ * POST /api/projects/:projectId/monitoring/evaluate
+ * Trigger on-demand re-evaluation of execution monitoring telemetry
+ * Protected: DISTRICT_AUTHORITY, STATE_NODAL_AUTHORITY, MINISTRY, IMPLEMENTING_AGENCY (Admin Isolation enforced)
+ */
+router.post(
+  '/:projectId/monitoring/evaluate',
+  authenticate,
+  authorize('DISTRICT_AUTHORITY', 'STATE_NODAL_AUTHORITY', 'MINISTRY', 'IMPLEMENTING_AGENCY', 'ADMIN'),
+  async (req, res, next) => {
+    try {
+      const { role } = req.user;
+      const projectId = req.params.projectId.trim().toUpperCase();
+
+      if (role === 'ADMIN') {
+        return ApiResponse.forbidden(
+          res,
+          'Access denied: Admin isolation prohibits administrative accounts from accessing project monitoring data per rules.md §10',
+          'ADMIN_ISOLATION'
+        );
+      }
+
+      const project = await Project.findOne({ project_id: projectId }).lean();
+      if (!project) {
+        return ApiResponse.notFound(res, `Project '${projectId}' not found`);
+      }
+
+      const access = await checkProjectAccess(project, req.user);
+      if (!access.allowed) {
+        return ApiResponse.forbidden(res, access.message, access.code);
+      }
+
+      const telemetry = await executionMonitoringService.evaluateProjectExecution(projectId, req.user);
+      return ApiResponse.success(res, telemetry, 'Continuous execution monitoring re-evaluated successfully');
+    } catch (err) {
+      next(err);
+    }
+  }
+);
 
 module.exports = router;
 

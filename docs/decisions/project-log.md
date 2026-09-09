@@ -515,3 +515,52 @@ AI compares, detects anomalies, calculates/receives risk signals, explains findi
   - Decisions are strictly append-only; an immutable historical record with full risk snapshot is preserved.
   - Admin Isolation remains 100% intact: Admin accounts receive HTTP 403 `ADMIN_ISOLATION` on both review and decision endpoints.
   - Human-in-the-loop is strictly upheld: AI never auto-decides; only authorized District Authority officials can execute administrative status transitions.
+
+### Phase 11: Continuous Execution Monitoring
+- **Status**: Complete
+- **Exit Checklist**:
+  - [x] Requirements completed
+  - [x] Code reviewed
+  - [x] Feature tested
+  - [x] Security/permissions verified where applicable
+  - [x] Documentation/memory updated where applicable
+  - [x] No known blocking issues
+- **Done**:
+  - Backend Execution Monitoring Service (`backend-node/src/services/executionMonitoringService.js`):
+    - Implemented `evaluateProjectExecution(projectId, requestingUser)` calculating execution telemetry:
+      - Financial disbursed percentage vs physical progress percentage.
+      - Discrepancy gap percentage calculation (`financial_disbursed_pct - physical_progress_pct`) per PRD §12.5 & §12.6.
+      - Mismatch severity categorization: `LOW` (<= 15%), `MEDIUM` (15%–30%), `HIGH` (> 30%).
+      - Progress jump detection: abnormal surges (> 50% in <= 14 days without intermediate milestones) and unverified completion claims.
+      - Timeline delay & staleness tracking (> 60 days without progress reports on active works).
+      - DPR engineering estimate drift comparison.
+      - Advisory recommendations (`NORMAL_MONITORING`, `MONITORING_ALERT`, `GROUND_VERIFICATION_RECOMMENDED`).
+    - Persists append-only flags to `ai_risk_flags` and updates composite risk score in `ai_risk_scores`.
+    - Dispatches server-validated notifications in `notifications` collection with hierarchical tiers (District on MEDIUM/HIGH, State on HIGH).
+    - `getActiveMonitoringQueue(user, filters)` returning jurisdiction-scoped active works queue with optional `mismatched_only` filter.
+  - Backend Express Ingestion Triggers & Routes (`backend-node/src/routes/projects.js`):
+    - `GET /api/projects/monitoring/active`: Returns active works monitoring queue scoped by user jurisdiction (District / State / Ministry / Auditor).
+    - `GET /api/projects/:projectId/monitoring`: Returns complete execution monitoring telemetry package.
+    - `POST /api/projects/:projectId/monitoring/evaluate`: Allows authorized officials to trigger on-demand execution re-evaluation.
+    - Automatic ingestion trigger in `POST /api/projects/:projectId/progress`: Runs execution evaluation upon progress reports and attaches `data.monitoring`.
+    - Automatic disbursement trigger in `PATCH /api/projects/:projectId/payments/:paymentId`: Runs execution evaluation upon payment approval/disbursement.
+    - Strict Admin Isolation enforced on all monitoring endpoints: HTTP 403 `ADMIN_ISOLATION` per `rules.md` §10.
+  - Frontend UI Integration (`frontend/`):
+    - `ExecutionMonitoringCard.jsx`: Dedicated post-sanction execution monitoring card featuring:
+      - Comparison bars for Physical Progress (%) and Financial Disbursed (%).
+      - Discrepancy gap badge with color-coded severity.
+      - Abnormal jump warning banner and days since last progress indicator.
+      - Advisory disclaimer box (*"Advisory Only — Administrative Discretion Required"*).
+      - On-demand "Refresh Monitoring" action invoking `/evaluate`.
+    - `ProjectDetailModal.jsx`: Embedded `ExecutionMonitoringCard` at the top of the Physical Progress tab for active works (`SANCTIONED`, `IN_PROGRESS`, `TECHNICAL_SANCTION_PENDING`, `INSPECTION_REQUESTED`, `HELD`).
+  - Automated Tests & Verification:
+    - `tests/backend/executionMonitoringPhase11.test.js`: **15/15 passing** across 4 suites (Execution Analysis Engine, Express Ingestion Triggers & API Surface, Multi-Tier Governance & Hierarchical Alerts, Admin Isolation & Human-in-the-Loop Safeguards).
+    - `tests/frontend/phase11ExecutionMonitoring.test.js`: **6/6 passing** (Component exports, API endpoints, gauge rendering, advisory disclaimer, modal integration, Admin isolation).
+    - Full unified test suite (`node tests/runAll.js`): **205/205 passing across 31 test suites**.
+    - Frontend production build (`npm run build:frontend`): **Passes cleanly in 1.11s with 0 errors**.
+- **Not done / remaining**:
+  - Phase 12 (Scheduled Automation & Escalation / physical inspection targeting). Do not start until requested.
+- **Notes**:
+  - Express is the sole authorization and persistence boundary.
+  - AI remains strictly advisory per `rules.md` §12: high mismatch never automatically holds, suspends, or cancels a project.
+  - Admin isolation verified: Admins receive 403 `ADMIN_ISOLATION` and cannot access execution monitoring data.

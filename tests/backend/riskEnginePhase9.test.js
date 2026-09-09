@@ -404,6 +404,7 @@ describe('Phase 9: Risk Engine, AI Gateway & Explainable AI Tests', () => {
         riskLevel: 'HIGH',
         category: 'Roads & Bridges',
         topContributors: [{ type: 'COST_ANOMALY', severity: 'HIGH', score: 88, reason: 'High cost' }],
+        providerOverride: 'gemini',
       });
 
       assert.equal(res.status, 'AI_ANALYSIS_UNAVAILABLE');

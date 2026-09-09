@@ -4,6 +4,7 @@ import { StatusBadge, RiskBadge } from './Badge';
 import Button from './Button';
 import AiHistoricalIntelligencePanel from './AiHistoricalIntelligencePanel';
 import AiReviewPanel from './AiReviewPanel';
+import ExecutionMonitoringCard from './ExecutionMonitoringCard';
 
 export function ProjectDetailModal({
   projectId,
@@ -630,6 +631,9 @@ export function ProjectDetailModal({
               {/* TAB 3: PHYSICAL PROGRESS */}
               {activeTab === 'progress' && (
                 <div>
+                  <div style={{ marginBottom: '16px' }}>
+                    <ExecutionMonitoringCard projectId={projectId} onMonitoringUpdated={fetchProject360} />
+                  </div>
                   <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 'var(--space-3)' }}>
                     <h4 style={{ margin: 0, color: 'var(--color-primary)' }}>Physical Progress Records</h4>
                     {isAgency && !showProgressForm && (

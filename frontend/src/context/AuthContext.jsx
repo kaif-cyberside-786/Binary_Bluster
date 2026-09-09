@@ -161,5 +161,32 @@ export function useAuth() {
   return context;
 }
 
+/**
+ * Canonical workspace path resolver by user role
+ * Supports all 7 canonical platform roles and legacy aliases
+ */
+export function getWorkspacePath(role) {
+  switch (role) {
+    case 'MP':
+      return '/mp';
+    case 'DISTRICT_AUTHORITY':
+      return '/district';
+    case 'IMPLEMENTING_AGENCY':
+      return '/agency';
+    case 'STATE_NODAL_AUTHORITY':
+    case 'STATE_NODAL_OFFICER':
+      return '/state';
+    case 'MINISTRY':
+    case 'MINISTRY_OFFICER':
+      return '/ministry';
+    case 'AUDITOR':
+      return '/auditor';
+    case 'ADMIN':
+      return '/admin';
+    default:
+      return '/';
+  }
+}
+
 export default AuthContext;
 

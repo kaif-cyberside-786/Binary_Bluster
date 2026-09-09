@@ -1,6 +1,6 @@
 import React from 'react';
-import { BrowserRouter, Routes, Route, Navigate, useNavigate } from 'react-router-dom';
-import { AuthProvider, useAuth } from './context/AuthContext';
+import { BrowserRouter, Routes, Route, Navigate, useNavigate, useLocation } from 'react-router-dom';
+import { AuthProvider, useAuth, getWorkspacePath } from './context/AuthContext';
 import { PreferencesProvider } from './context/PreferencesContext';
 import Header from './components/Header';
 import Footer from './components/Footer';
@@ -36,10 +36,33 @@ function PublicLayout({ children, activeView }) {
 }
 
 function LandingRouteWrapper() {
+  const { isAuthenticated, user, loading } = useAuth();
   const navigate = useNavigate();
+  const location = useLocation();
+
+  if (loading) {
+    return null;
+  }
+
+  const searchParams = new URLSearchParams(location.search);
+  const allowPublicView = searchParams.get('view') === 'public';
+
+  // Authenticated users visiting / or /landing redirect to their role workspace by default
+  if (isAuthenticated && user?.role && !allowPublicView) {
+    return <Navigate to={getWorkspacePath(user.role)} replace />;
+  }
+
   return (
     <PublicLayout activeView="landing">
-      <LandingPage onSignInClick={() => navigate('/login')} />
+      <LandingPage
+        onSignInClick={() => {
+          if (isAuthenticated && user?.role) {
+            navigate(getWorkspacePath(user.role));
+          } else {
+            navigate('/login');
+          }
+        }}
+      />
     </PublicLayout>
   );
 }
@@ -53,6 +76,12 @@ function ShellRouteWrapper() {
 }
 
 function LoginRouteWrapper() {
+  const { isAuthenticated, user, loading } = useAuth();
+
+  if (!loading && isAuthenticated && user?.role) {
+    return <Navigate to={getWorkspacePath(user.role)} replace />;
+  }
+
   return (
     <PublicLayout activeView="login">
       <LoginPage />
@@ -76,6 +105,7 @@ export function App() {
           <Routes>
             {/* Public Routes */}
             <Route path="/" element={<LandingRouteWrapper />} />
+            <Route path="/landing" element={<LandingRouteWrapper />} />
             <Route path="/shell" element={<ShellRouteWrapper />} />
             <Route path="/login" element={<LoginRouteWrapper />} />
             <Route path="/unauthorized" element={<UnauthorizedRouteWrapper />} />

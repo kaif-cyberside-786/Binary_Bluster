@@ -1,33 +1,12 @@
 import React from 'react';
 import { useNavigate } from 'react-router-dom';
-import { useAuth } from '../context/AuthContext';
+import { useAuth, getWorkspacePath } from '../context/AuthContext';
 import Button from '../components/Button';
 import Card from '../components/Card';
 
 export function UnauthorizedPage() {
   const { user, logout } = useAuth();
   const navigate = useNavigate();
-
-  const getWorkspacePath = (role) => {
-    switch (role) {
-      case 'MP':
-        return '/mp';
-      case 'DISTRICT_AUTHORITY':
-        return '/district';
-      case 'IMPLEMENTING_AGENCY':
-        return '/agency';
-      case 'STATE_NODAL_OFFICER':
-        return '/state';
-      case 'MINISTRY_OFFICER':
-        return '/ministry';
-      case 'AUDITOR':
-        return '/auditor';
-      case 'ADMIN':
-        return '/admin';
-      default:
-        return '/';
-    }
-  };
 
   const handleGoToWorkspace = () => {
     if (user?.role) {

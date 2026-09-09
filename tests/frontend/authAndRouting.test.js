@@ -90,6 +90,33 @@ describe('Frontend Auth & Role-Based Workspaces Verification Tests', () => {
     assert.ok(content.includes('path="/admin/*"'));
     assert.ok(content.includes('path="/login"'));
     assert.ok(content.includes('path="/unauthorized"'));
+    assert.ok(content.includes('path="/landing"'), 'App.jsx must configure /landing route');
+    assert.ok(content.includes('getWorkspacePath'), 'App.jsx must use getWorkspacePath for authenticated redirects');
+  });
+
+  test('Canonical role-based workspace path resolver getWorkspacePath maps all 7 roles correctly', () => {
+    const authContextPath = path.join(srcDir, 'context/AuthContext.jsx');
+    const content = fs.readFileSync(authContextPath, 'utf8');
+
+    assert.ok(content.includes('export function getWorkspacePath'), 'Must export getWorkspacePath');
+    assert.ok(content.includes("case 'MINISTRY':"), 'Must map MINISTRY');
+    assert.ok(content.includes("case 'STATE_NODAL_AUTHORITY':"), 'Must map STATE_NODAL_AUTHORITY');
+    assert.ok(content.includes("case 'IMPLEMENTING_AGENCY':"), 'Must map IMPLEMENTING_AGENCY');
+    assert.ok(content.includes("case 'DISTRICT_AUTHORITY':"), 'Must map DISTRICT_AUTHORITY');
+    assert.ok(content.includes("case 'MP':"), 'Must map MP');
+    assert.ok(content.includes("case 'AUDITOR':"), 'Must map AUDITOR');
+    assert.ok(content.includes("case 'ADMIN':"), 'Must map ADMIN');
+  });
+
+  test('LoginPage and Header use canonical getWorkspacePath for seamless workspace navigation', () => {
+    const loginPath = path.join(srcDir, 'pages/LoginPage.jsx');
+    const loginContent = fs.readFileSync(loginPath, 'utf8');
+    assert.ok(loginContent.includes('getWorkspacePath'), 'LoginPage must use getWorkspacePath');
+
+    const headerPath = path.join(srcDir, 'components/Header.jsx');
+    const headerContent = fs.readFileSync(headerPath, 'utf8');
+    assert.ok(headerContent.includes('getWorkspacePath'), 'Header must use getWorkspacePath');
+    assert.ok(headerContent.includes('My Workspace ({user.role})'), 'Header must render role workspace button');
   });
 });
 
