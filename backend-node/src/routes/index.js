@@ -50,4 +50,8 @@ router.use('/user/preferences', userPreferenceRoutes);
 const agencyRoutes = require('./agencies');
 router.use('/agencies', agencyRoutes);
 
+// Mount inspection & field verification routes (/api/inspections/...)
+const inspectionRoutes = require('./inspections');
+router.use('/inspections', inspectionRoutes);
+
 module.exports = router;

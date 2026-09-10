@@ -5,6 +5,7 @@ import Button from './Button';
 import AiHistoricalIntelligencePanel from './AiHistoricalIntelligencePanel';
 import AiReviewPanel from './AiReviewPanel';
 import ExecutionMonitoringCard from './ExecutionMonitoringCard';
+import { InspectionStatusBadge, PriorityBadge } from './InspectionQueueCard';
 
 export function ProjectDetailModal({
   projectId,
@@ -77,6 +78,7 @@ export function ProjectDetailModal({
   const ucs = data?.utilization_certificates || [];
   const documents = data?.documents || [];
   const aiFindings = data?.ai_findings || [];
+  const inspections = data?.inspections || [];
 
   const isAgency = user?.role === 'IMPLEMENTING_AGENCY';
   const isDistrict = user?.role === 'DISTRICT_AUTHORITY';
@@ -369,6 +371,7 @@ export function ProjectDetailModal({
             { key: 'progress', label: `Physical Progress (${progressList.length})` },
             { key: 'payments', label: `Disbursements (${payments.length})` },
             { key: 'documents', label: `UCs & Docs (${ucs.length + documents.length})` },
+            { key: 'inspections', label: `Field Inspections (${inspections.length})` },
             { key: 'decisions', label: `Audit Trail (${decisions.length})` },
           ].map((tab) => (
             <button
@@ -1116,6 +1119,127 @@ export function ProjectDetailModal({
                       </table>
                     )}
                   </div>
+                </div>
+              )}
+
+              {/* TAB: FIELD INSPECTIONS (Phase 13) */}
+              {activeTab === 'inspections' && (
+                <div>
+                  <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 'var(--space-3)' }}>
+                    <h4 style={{ margin: 0, color: 'var(--color-primary)' }}>Field Verification & Physical Inspections</h4>
+                    <span style={{ fontSize: '11px', color: 'var(--color-muted)' }}>
+                      Guidelines §5.2 Statutory Oversight
+                    </span>
+                  </div>
+
+                  {inspections.length === 0 ? (
+                    <div style={{ padding: '24px', textAlign: 'center', color: 'var(--color-muted)', border: '1px dashed var(--color-border)', borderRadius: 'var(--radius-sm)' }}>
+                      No inspection has been recommended for this project.
+                    </div>
+                  ) : (
+                    <div style={{ display: 'flex', flexDirection: 'column', gap: '14px' }}>
+                      {inspections.map((insp, idx) => (
+                        <div
+                          key={insp.inspection_id || idx}
+                          style={{
+                            border: '1px solid var(--color-border)',
+                            borderRadius: 'var(--radius-sm)',
+                            padding: '14px 16px',
+                            backgroundColor: '#FAFAFA',
+                          }}
+                        >
+                          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', marginBottom: '8px', flexWrap: 'wrap', gap: '6px' }}>
+                            <div style={{ display: 'flex', alignItems: 'center', gap: '8px', flexWrap: 'wrap' }}>
+                              <span style={{ fontFamily: 'monospace', fontWeight: 700, fontSize: '13px', color: 'var(--color-secondary)' }}>
+                                {insp.inspection_id}
+                              </span>
+                              <InspectionStatusBadge status={insp.status} />
+                              <PriorityBadge priority={insp.priority} score={insp.priority_score} />
+                            </div>
+                            <span style={{ fontSize: '11px', color: 'var(--color-muted)' }}>
+                              Type: <strong>{insp.inspection_type?.replace(/_/g, ' ')}</strong> • Quota Year: <strong>{insp.quota_year}</strong>
+                            </span>
+                          </div>
+
+                          <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(200px, 1fr))', gap: '8px', fontSize: '12px', marginBottom: '10px' }}>
+                            <div>
+                              <span style={{ color: 'var(--color-muted)' }}>Recommendation Source:</span>{' '}
+                              <strong>{insp.recommendation_source?.replace(/_/g, ' ')}</strong>
+                            </div>
+                            <div>
+                              <span style={{ color: 'var(--color-muted)' }}>Assigned Officer:</span>{' '}
+                              <strong>{insp.assigned_officer_name || insp.assigned_officer_id || 'Unassigned'}</strong>
+                            </div>
+                            <div>
+                              <span style={{ color: 'var(--color-muted)' }}>Scheduled Date:</span>{' '}
+                              <strong>{insp.scheduled_date ? new Date(insp.scheduled_date).toLocaleDateString('en-IN') : 'Not scheduled'}</strong>
+                            </div>
+                            <div>
+                              <span style={{ color: 'var(--color-muted)' }}>Completed Date:</span>{' '}
+                              <strong>{insp.completed_date ? new Date(insp.completed_date).toLocaleDateString('en-IN') : 'Incomplete'}</strong>
+                            </div>
+                          </div>
+
+                          {insp.result && (
+                            <div
+                              style={{
+                                padding: '8px 12px',
+                                borderRadius: '4px',
+                                marginBottom: '10px',
+                                backgroundColor:
+                                  insp.result === 'NO_ISSUE'
+                                    ? '#F0FFF4'
+                                    : insp.result === 'REVIEW_REQUIRED'
+                                    ? '#FFFAF0'
+                                    : '#FFF5F5',
+                                border:
+                                  insp.result === 'NO_ISSUE'
+                                    ? '1px solid #9AE6B4'
+                                    : insp.result === 'REVIEW_REQUIRED'
+                                    ? '1px solid #FBD38D'
+                                    : '1px solid #FEB2B2',
+                              }}
+                            >
+                              <div style={{ fontSize: '12px', fontWeight: 700, color: 'var(--color-text)', marginBottom: '4px' }}>
+                                Official Inspection Result: <span style={{ color: insp.result === 'NO_ISSUE' ? 'var(--color-success)' : insp.result === 'REVIEW_REQUIRED' ? 'var(--color-warning)' : 'var(--color-error)' }}>{insp.result}</span>
+                              </div>
+                              <div style={{ fontSize: '12px', color: 'var(--color-text)' }}>
+                                <strong>Findings:</strong> {insp.findings_summary}
+                              </div>
+                              {insp.remarks && (
+                                <div style={{ fontSize: '11px', color: 'var(--color-muted)', marginTop: '4px' }}>
+                                  <strong>Remarks:</strong> {insp.remarks}
+                                </div>
+                              )}
+                            </div>
+                          )}
+
+                          {insp.evidence_document_ids && insp.evidence_document_ids.length > 0 && (
+                            <div style={{ fontSize: '11px', color: 'var(--color-muted)', marginBottom: '8px' }}>
+                              <strong>Evidence References:</strong> {insp.evidence_document_ids.join(', ')}
+                            </div>
+                          )}
+
+                          {/* Lifecycle History */}
+                          {insp.audit_trail && insp.audit_trail.length > 0 && (
+                            <div style={{ marginTop: '8px', borderTop: '1px dashed var(--color-border)', paddingTop: '8px' }}>
+                              <div style={{ fontSize: '11px', fontWeight: 600, color: 'var(--color-muted)', marginBottom: '4px' }}>
+                                Lifecycle Transition History:
+                              </div>
+                              <div style={{ display: 'flex', flexDirection: 'column', gap: '3px' }}>
+                                {insp.audit_trail.map((at, aIdx) => (
+                                  <div key={aIdx} style={{ fontSize: '11px', color: 'var(--color-text)' }}>
+                                    • <strong>{at.from_status} → {at.to_status}</strong> by <code>{at.transitioned_by}</code> ({new Date(at.transitioned_at).toLocaleString('en-IN')})
+                                    {at.reason && <span style={{ color: 'var(--color-muted)' }}> — {at.reason}</span>}
+                                  </div>
+                                ))}
+                              </div>
+                            </div>
+                          )}
+                        </div>
+                      ))}
+                    </div>
+                  )}
                 </div>
               )}
 

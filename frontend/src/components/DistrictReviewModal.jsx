@@ -183,6 +183,7 @@ export function DistrictReviewModal({ projectId, isOpen, onClose, onDecisionReco
           badgeColor: '#6B46C1',
           buttonVariant: 'secondary',
           confirmText: 'Confirm Inspection Request',
+          successNote: 'Inspection recommendation created.',
         };
       case 'ESCALATE':
         return {

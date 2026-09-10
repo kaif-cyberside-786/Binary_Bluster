@@ -611,10 +611,71 @@ AI compares, detects anomalies, calculates/receives risk signals, explains findi
     - Unified test suite (`npm test` / `node tests/runAll.js`): **231/231 passing across 38 suites**.
     - Frontend production build (`npm run build:frontend`): **Passes cleanly in 1.32s with 0 errors**.
 - **Not done / remaining**:
-  - Phase 13 (Field Verification & Inspection Intelligence / 10% DA & 1% SNA statutory quotas). Do not start until requested.
+  - None for Phase 12.
 - **Notes**:
   - Two separate products strictly preserved: Suitability (ranked advisory score per project) vs. Concentration (systemic work-share % and HHI).
   - Suitability is advisory only per `rules.md` §12: District Collector retains sole selection authority.
   - Concentration guardrail enforced in service logic per `prd.md` §12.8.
   - Admin Isolation verified: Admins receive 403 `ADMIN_ISOLATION` on all agency performance, suitability, and concentration endpoints.
 
+### Phase 13: Field Verification & Inspection Queue
+- **Status**: Complete
+- **Exit Checklist**:
+  - [x] Requirements completed
+  - [x] Code reviewed
+  - [x] Feature tested
+  - [x] Security/permissions verified where applicable
+  - [x] Documentation/memory updated where applicable
+  - [x] No known blocking issues
+- **Done**:
+  - Backend Canonical Inspection Model Extended (`backend-node/src/models/Inspection.js`):
+    - Extended schema with `priority_score`, `recommendation_source` (`AI_RISK`, `COMPLIANCE_NON_COMPLIANT`, `EXECUTION_ANOMALY`, `OFFICER_RECOMMENDATION`, `ANNUAL_QUOTA_SELECTION`, `CITIZEN_COMPLAINT`, `SYSTEMIC_ALERT`), `quota_year`, `state`, `district`, `assigned_by`, `assigned_officer_name`, `assigned_at`, `scheduled_date`, `scheduled_by`, `scheduled_at`, `completed_date`, `completed_by`, `completed_at`, `result_recorded_by`, `result_recorded_at`, `evidence_document_ids`, `remarks`, `findings_summary`, `audit_trail`.
+    - Added compound index `{ state: 1, district: 1, status: 1, priority_score: -1 }`.
+    - Canonical 7-stage lifecycle strictly enforced: `RECOMMENDED` -> `PENDING_DECISION` -> `ASSIGNED` -> `SCHEDULED` -> `IN_PROGRESS` -> `COMPLETED` -> `RESULT_RECORDED`.
+    - Canonical result recording outcomes strictly enforced: `NO_ISSUE`, `REVIEW_REQUIRED`, `ESCALATE`.
+    - Re-exported enum constants in `backend-node/src/models/index.js`.
+  - Backend Inspection Queue Service (`backend-node/src/services/inspectionQueueService.js`):
+    - `calculateInspectionPriority(...)`: Blends Phase 9 AI Risk (40%), Phase 6 Compliance (25%), Phase 11 Execution mismatch (20%), and Officer trigger (15%). Maps composite score (0-100) to tiers: `URGENT` (>=75), `HIGH` (50-74), `MEDIUM` (25-49), `ROUTINE` (<25).
+    - `buildInspectionQueue(...)`: Generates jurisdiction-scoped prioritized inspection queue with dynamic sorting.
+    - `recommendInspection(...)`: Idempotent recommendation upsert protecting against duplicate active inspections for the same project.
+    - `assignInspection(...)`: Human officer assignment validating inspector existence and recording audit trail.
+    - `scheduleInspection(...)`: Human officer visit scheduling with date validation.
+    - `transitionInspection(...)`: Strict canonical state machine validator preventing invalid lifecycle skips.
+    - `recordResult(...)`: Human officer inspection outcome recording (`NO_ISSUE`, `REVIEW_REQUIRED`, `ESCALATE`) with findings summary and evidence document IDs, updating project `inspection_status` without auto-closing or auto-sanctioning.
+    - `quotaStats(...)`: Real-time aggregation of eligible works, statutory targets (10% District DA per guidelines, 1% State SNA per §5.2), completed count, remaining count, and progress % computed strictly from live DB records.
+  - Backend Express API Routes (`backend-node/src/routes/inspections.js`):
+    - Mounted at `/api/inspections`.
+    - `GET /api/inspections`: Jurisdiction-filtered inspection queue (District, State, Ministry, Auditor).
+    - `GET /api/inspections/quota`: Live statutory inspection quota metrics.
+    - `GET /api/inspections/:inspectionId`: Detailed inspection record with audit trail.
+    - `POST /api/inspections/recommend`: Manually or programmatically triggers an inspection recommendation.
+    - `PATCH /api/inspections/:inspectionId/assign`: Human officer assigns an inspection.
+    - `PATCH /api/inspections/:inspectionId/status`: Human officer transitions lifecycle status.
+    - `POST /api/inspections/:inspectionId/result`: Human officer records final field verification outcome.
+    - Strict Admin Isolation enforced across all inspection endpoints: HTTP 403 `ADMIN_ISOLATION` per `rules.md` §10.
+    - Auditor read-only enforcement: HTTP 403 `FORBIDDEN_ROLE` on all write endpoints.
+    - Cross-jurisdiction boundary enforcement: HTTP 403 `FORBIDDEN_JURISDICTION`.
+  - Integration with Phase 10 Decision Workflow & Project 360 (`backend-node/src/routes/projects.js`):
+    - `ORDER_INSPECTION` decision in Phase 10 seamlessly invokes `inspectionQueueService.recommendInspection(projectId, 'OFFICER_RECOMMENDATION', req.user, ...)`.
+    - `GET /api/projects/:projectId` includes historical and active `inspections` array for Project 360 view.
+  - Frontend UI Components & Workspaces (`frontend/`):
+    - `InspectionQueueCard.jsx`: Reusable full-featured inspection queue component with:
+      - Composite priority score badge (`URGENT`, `HIGH`, `MEDIUM`, `ROUTINE`).
+      - Canonical lifecycle status badge.
+      - Dynamic filter bar (priority tier, status, search).
+      - Interactive human-in-the-loop action modals: Assign Officer, Schedule Visit, Record Findings (`NO_ISSUE`, `REVIEW_REQUIRED`, `ESCALATE`).
+      - Advisory and statutory notice banners.
+    - `DistrictWorkspace.jsx`: Embedded `InspectionQueueCard` under dedicated `inspections` section with 10% statutory quota progress.
+    - `StateWorkspace.jsx`: Integrated live 1% State inspection quota statutory metrics card and statewide inspection queue.
+    - `ProjectDetailModal.jsx`: Added dedicated `Field Inspections` tab displaying complete inspection lifecycle history and findings.
+    - `DistrictReviewModal.jsx`: Enhanced `ORDER_INSPECTION` action button with clear user confirmation feedback.
+  - Automated Tests & Verification:
+    - `tests/backend/inspectionQueuePhase13.test.js`: **25/25 passing** (Priority calculation, idempotency/anti-duplication, canonical state transitions, result recording, statutory quotas, admin isolation, auditor read-only, cross-jurisdiction).
+    - `tests/frontend/inspectionQueuePhase13Frontend.test.js`: **10/10 passing** (Component rendering, filters, priority badges, modal workflows, state and district workspace integration, project detail integration, admin isolation).
+    - Phase 8-12 regression suites: all passing.
+    - Python AI Service: **20/20 passing** (`py -m unittest discover -s ai-service/tests`).
+    - Frontend Production Build: **Passes cleanly with 0 errors**.
+- **Notes**:
+  - Distinction between Risk Score and Inspection Priority preserved: Phase 9 Risk Score remains authoritative; Phase 13 Inspection Priority blends Risk, Compliance, Execution, and Officer triggers into an actionable operational queue.
+  - Human-in-the-loop strictly enforced: AI recommends candidates, but human officers assign, schedule, conduct visits, and record results.
+  - Admin Isolation verified: Admins receive 403 `ADMIN_ISOLATION` and cannot access inspection records.

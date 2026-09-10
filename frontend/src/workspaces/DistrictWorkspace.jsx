@@ -9,6 +9,7 @@ import ProjectDetailModal from '../components/ProjectDetailModal';
 import DistrictReviewModal from '../components/DistrictReviewModal';
 import AiHistoricalIntelligencePanel from '../components/AiHistoricalIntelligencePanel';
 import AiReviewPanel from '../components/AiReviewPanel';
+import InspectionQueueCard from '../components/InspectionQueueCard';
 
 export function DistrictWorkspace() {
   const { user, authFetch } = useAuth();
@@ -338,6 +339,17 @@ export function DistrictWorkspace() {
               <strong>Statutory Requirement (Guidelines §5.2):</strong> The District Collector / District Magistrate is statutorily mandated to physically inspect at least 10% of all works implemented in the district annually. Field inspections verify execution quality, physical progress against milestones, and ensure no duplicate works exist on the ground.
             </div>
           </Card>
+
+          {/* Phase 13 District Field Inspection Queue */}
+          <div style={{ marginTop: 'var(--space-6)' }}>
+            <InspectionQueueCard
+              title="District Field Inspection Queue"
+              subtitle={`Prioritized field verification candidates within ${district} District`}
+              defaultDistrict={district}
+              readOnly={false}
+              onOpenProjectDetail={(id) => setSelected360ProjectId(id)}
+            />
+          </div>
         </div>
       )}
 

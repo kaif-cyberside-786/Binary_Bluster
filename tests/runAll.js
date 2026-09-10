@@ -26,6 +26,7 @@ const testFiles = [
   path.resolve(__dirname, 'backend/districtReviewDecisionPhase10.test.js'),
   path.resolve(__dirname, 'backend/executionMonitoringPhase11.test.js'),
   path.resolve(__dirname, 'backend/agencyIntelligencePhase12.test.js'),
+  path.resolve(__dirname, 'backend/inspectionQueuePhase13.test.js'),
   path.resolve(__dirname, 'frontend/designTokens.test.js'),
   path.resolve(__dirname, 'frontend/authAndRouting.test.js'),
   path.resolve(__dirname, 'frontend/phase4Workspaces.test.js'),
@@ -35,6 +36,7 @@ const testFiles = [
   path.resolve(__dirname, 'frontend/phase10DistrictReview.test.js'),
   path.resolve(__dirname, 'frontend/phase11ExecutionMonitoring.test.js'),
   path.resolve(__dirname, 'frontend/phase12AgencyIntelligence.test.js'),
+  path.resolve(__dirname, 'frontend/inspectionQueuePhase13Frontend.test.js'),
 ];
 
 console.log('Running MPLADS Test Suites (Backend + Frontend)...');

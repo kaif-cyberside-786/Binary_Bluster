@@ -14,8 +14,10 @@ const { withTransaction } = require('../utils/transaction');
 const { handleDocumentUpload, computeFileHash } = require('../middleware/upload');
 const aiOrchestrator = require('../services/aiOrchestrator');
 const executionMonitoringService = require('../services/executionMonitoringService');
+const inspectionQueueService = require('../services/inspectionQueueService');
 const {
   Project,
+  Inspection,
   ProjectRecommendation,
   OfficerDecision,
   AuditLog,
@@ -531,6 +533,7 @@ router.get('/:projectId', authenticate, async (req, res, next) => {
       complianceFindings,
       aiFindings,
       currentRisk,
+      inspections,
     ] = await Promise.all([
       ProjectRecommendation.findOne({ project_id: projectId }).lean(),
       OfficerDecision.find({ project_id: projectId }).sort({ decided_at: -1 }).lean(),
@@ -542,6 +545,7 @@ router.get('/:projectId', authenticate, async (req, res, next) => {
       ComplianceFinding.find({ project_id: projectId }).sort({ rule_id: 1 }).lean(),
       AiRiskFlag.find({ project_id: projectId }).sort({ created_at: -1 }).lean(),
       AiRiskScore.findOne({ project_id: projectId }).lean(),
+      Inspection.find({ project_id: projectId }).sort({ created_at: -1 }).lean(),
     ]);
 
     // Compute overall compliance status
@@ -567,6 +571,7 @@ router.get('/:projectId', authenticate, async (req, res, next) => {
         payments: payments || [],
         utilization_certificates: utilizationCertificates || [],
         documents: documents || [],
+        inspections: inspections || [],
         compliance: {
           overall_status: complianceStatus,
           findings: complianceFindings || [],
@@ -1091,6 +1096,24 @@ router.patch(
 
         createdDecision = decisionDoc;
       });
+
+      // Phase 13 Integration: If decision is ORDER_INSPECTION, create/upsert inspection recommendation
+      if (decision === 'ORDER_INSPECTION') {
+        try {
+          await inspectionQueueService.recommendInspection(
+            projectId,
+            'OFFICER_RECOMMENDATION',
+            req.user,
+            {
+              reason: reason.trim(),
+              priority: 'HIGH',
+              remarks: supportingNote,
+            }
+          );
+        } catch (inspErr) {
+          logger.warn(`Failed to auto-upsert inspection on ORDER_INSPECTION for ${projectId}: ${inspErr.message}`);
+        }
+      }
 
       logger.info(
         `Decision applied on ${projectId}: ${decision} by ${user_id} (${prevStatus} -> ${newStatus})`,

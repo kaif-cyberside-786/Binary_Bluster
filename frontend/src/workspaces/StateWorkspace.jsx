@@ -3,10 +3,12 @@ import { useAuth } from '../context/AuthContext';
 import WorkspaceLayout from './WorkspaceLayout';
 import Card from '../components/Card';
 import AgencyConcentrationPanel from '../components/AgencyConcentrationPanel';
+import InspectionQueueCard from '../components/InspectionQueueCard';
 
 export function StateWorkspace() {
   const { user, authFetch } = useAuth();
   const [data, setData] = useState(null);
+  const [quotaData, setQuotaData] = useState(null);
   const [loading, setLoading] = useState(true);
   const [activeSection, setActiveSection] = useState('dashboard');
 
@@ -22,12 +24,17 @@ export function StateWorkspace() {
 
   const fetchStateData = useCallback(async () => {
     try {
-      const res = await authFetch('/api/dashboard/state');
-      if (res.ok) {
-        const body = await res.json();
-        if (body.success) {
-          setData(body.data);
-        }
+      const [dashRes, quotaRes] = await Promise.all([
+        authFetch('/api/dashboard/state'),
+        authFetch('/api/inspections/quota?level=STATE'),
+      ]);
+      if (dashRes.ok) {
+        const body = await dashRes.json();
+        if (body.success) setData(body.data);
+      }
+      if (quotaRes.ok) {
+        const qBody = await quotaRes.json();
+        if (qBody.success) setQuotaData(qBody.data);
       }
     } catch (err) {
       console.error('Failed to fetch state dashboard:', err);
@@ -130,14 +137,69 @@ export function StateWorkspace() {
         </div>
       )}
 
-      {/* 1% Inspection Mandate Panel */}
+      {/* 1% Inspection Mandate Panel & Live Queue */}
       {activeSection === 'inspections' && (
         <div style={{ marginBottom: 'var(--space-6)' }}>
-          <Card title="1% Physical Inspection Quota Details" subtitle="State Nodal Authority Oversight (§5.2)">
+          <Card title="State 1% Physical Inspection Quota" subtitle="State Nodal Authority Oversight (Guidelines §5.2)">
+            <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(180px, 1fr))', gap: 'var(--space-4)', marginBottom: 'var(--space-4)' }}>
+              <div style={{ padding: 'var(--space-3)', backgroundColor: '#F8FAFC', borderRadius: 'var(--radius-sm)', border: '1px solid var(--color-border)' }}>
+                <div style={{ fontSize: '11px', color: 'var(--color-muted)', fontWeight: 600 }}>ELIGIBLE WORKS (STATEWIDE)</div>
+                <div style={{ fontSize: '22px', fontWeight: 700, color: 'var(--color-primary)', marginTop: '4px' }}>
+                  {quotaData ? quotaData.eligible_works : counts.total || 0}
+                </div>
+              </div>
+              <div style={{ padding: 'var(--space-3)', backgroundColor: '#F8FAFC', borderRadius: 'var(--radius-sm)', border: '1px solid var(--color-border)' }}>
+                <div style={{ fontSize: '11px', color: 'var(--color-muted)', fontWeight: 600 }}>1% STATUTORY TARGET</div>
+                <div style={{ fontSize: '22px', fontWeight: 700, color: 'var(--color-secondary)', marginTop: '4px' }}>
+                  {quotaData ? quotaData.target_count : inspections.target_1_percent || 1} works
+                </div>
+              </div>
+              <div style={{ padding: 'var(--space-3)', backgroundColor: '#F8FAFC', borderRadius: 'var(--radius-sm)', border: '1px solid var(--color-border)' }}>
+                <div style={{ fontSize: '11px', color: 'var(--color-muted)', fontWeight: 600 }}>COMPLETED INSPECTIONS</div>
+                <div style={{ fontSize: '22px', fontWeight: 700, color: 'var(--color-success)', marginTop: '4px' }}>
+                  {quotaData ? quotaData.completed_count : inspections.completed || 0}
+                </div>
+              </div>
+              <div style={{ padding: 'var(--space-3)', backgroundColor: '#F8FAFC', borderRadius: 'var(--radius-sm)', border: '1px solid var(--color-border)' }}>
+                <div style={{ fontSize: '11px', color: 'var(--color-muted)', fontWeight: 600 }}>REMAINING TO INSPECT</div>
+                <div style={{ fontSize: '22px', fontWeight: 700, color: 'var(--color-warning)', marginTop: '4px' }}>
+                  {quotaData ? quotaData.remaining_count : Math.max(0, (inspections.target_1_percent || 1) - (inspections.completed || 0))}
+                </div>
+              </div>
+              <div style={{ padding: 'var(--space-3)', backgroundColor: '#F8FAFC', borderRadius: 'var(--radius-sm)', border: '1px solid var(--color-border)' }}>
+                <div style={{ fontSize: '11px', color: 'var(--color-muted)', fontWeight: 600 }}>QUOTA PROGRESS</div>
+                <div style={{ fontSize: '22px', fontWeight: 700, color: 'var(--color-primary)', marginTop: '4px' }}>
+                  {quotaData ? quotaData.progress_percentage : inspections.percentage || 0}%
+                </div>
+              </div>
+            </div>
+
+            <div style={{ marginBottom: 'var(--space-4)' }}>
+              <div style={{ height: '10px', backgroundColor: '#E2E8F0', borderRadius: '5px', overflow: 'hidden' }}>
+                <div
+                  style={{
+                    width: `${quotaData ? quotaData.progress_percentage : inspections.percentage || 0}%`,
+                    height: '100%',
+                    backgroundColor: 'var(--color-secondary)',
+                    transition: 'width 0.4s ease',
+                  }}
+                />
+              </div>
+            </div>
+
             <div style={{ padding: 'var(--space-4)', backgroundColor: '#EDF4FC', borderRadius: 'var(--radius-sm)', fontSize: 'var(--font-size-sm)', color: '#1E3A8A', lineHeight: 1.6 }}>
               <strong>Statutory Requirement (Guidelines §5.2):</strong> State Nodal Department officers are required to physically inspect at least 1% of works implemented in each district annually. Field inspections by state teams benchmark quality, adherence to administrative approvals, and coordinate with District Collectors to resolve bottleneck issues.
             </div>
           </Card>
+
+          {/* Statewide Prioritized Field Inspection Queue */}
+          <div style={{ marginTop: 'var(--space-6)' }}>
+            <InspectionQueueCard
+              title="Statewide Prioritized Field Inspection Queue"
+              subtitle={`Supervisory inspection candidates across ${state} districts`}
+              readOnly={true}
+            />
+          </div>
         </div>
       )}
 
