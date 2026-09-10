@@ -58,4 +58,8 @@ router.use('/inspections', inspectionRoutes);
 const systemicRoutes = require('./systemic');
 router.use('/systemic', systemicRoutes);
 
+// Mount audit & traceability routes (/api/audit/...)
+const auditRoutes = require('./audit');
+router.use('/audit', auditRoutes);
+
 module.exports = router;

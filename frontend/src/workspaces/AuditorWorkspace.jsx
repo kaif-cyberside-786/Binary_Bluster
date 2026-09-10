@@ -9,6 +9,9 @@ export function AuditorWorkspace() {
   const [data, setData] = useState(null);
   const [loading, setLoading] = useState(true);
   const [activeSection, setActiveSection] = useState('dashboard');
+  const [auditLogs, setAuditLogs] = useState([]);
+  const [auditLoading, setAuditLoading] = useState(false);
+  const [logFilter, setLogFilter] = useState('ALL');
 
   const navItems = [
     { label: 'Audit Dashboard', key: 'dashboard' },
@@ -33,9 +36,32 @@ export function AuditorWorkspace() {
     }
   }, [authFetch]);
 
+  const fetchAuditLogs = useCallback(async () => {
+    try {
+      setAuditLoading(true);
+      const res = await authFetch('/api/audit?limit=100');
+      if (res.ok) {
+        const body = await res.json();
+        if (body.success) {
+          setAuditLogs(body.data?.records || []);
+        }
+      }
+    } catch (err) {
+      console.error('Failed to fetch audit logs:', err);
+    } finally {
+      setAuditLoading(false);
+    }
+  }, [authFetch]);
+
   useEffect(() => {
     fetchAuditorData();
   }, [fetchAuditorData]);
+
+  useEffect(() => {
+    if (activeSection === 'logs') {
+      fetchAuditLogs();
+    }
+  }, [activeSection, fetchAuditLogs]);
 
   const metrics = data?.audit_metrics || {};
   const recentDecisions = data?.recent_decisions || [];
@@ -121,10 +147,12 @@ export function AuditorWorkspace() {
       {activeSection === 'logs' && (
         <div style={{ marginBottom: 'var(--space-6)' }}>
           <Card title="Permanent Write-Once Audit Ledger" subtitle="Immutable audit trail & tamper-evident history">
+          <Card title="Permanent Write-Once Audit Ledger" subtitle="Immutable audit trail & tamper-evident history per rules.md §9">
             <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(220px, 1fr))', gap: 'var(--space-4)', marginBottom: 'var(--space-4)' }}>
               <div style={{ padding: 'var(--space-3)', backgroundColor: '#F8FAFC', borderRadius: 'var(--radius-sm)', border: '1px solid var(--color-border)' }}>
                 <div style={{ fontSize: '11px', color: 'var(--color-muted)', fontWeight: 600 }}>TOTAL LEDGER ENTRIES</div>
                 <div style={{ fontSize: '22px', fontWeight: 700, color: 'var(--color-success)', marginTop: '4px' }}>{metrics.total_audit_logs || 0}</div>
+                <div style={{ fontSize: '22px', fontWeight: 700, color: 'var(--color-success)', marginTop: '4px' }}>{metrics.total_audit_logs || auditLogs.length}</div>
               </div>
               <div style={{ padding: 'var(--space-3)', backgroundColor: '#F8FAFC', borderRadius: 'var(--radius-sm)', border: '1px solid var(--color-border)' }}>
                 <div style={{ fontSize: '11px', color: 'var(--color-muted)', fontWeight: 600 }}>RECORDED DECISIONS</div>
@@ -136,8 +164,134 @@ export function AuditorWorkspace() {
               </div>
             </div>
             <div style={{ padding: 'var(--space-3)', backgroundColor: '#EDF4FC', borderRadius: 'var(--radius-sm)', fontSize: 'var(--font-size-sm)', color: '#1E3A8A' }}>
+            <div style={{ padding: 'var(--space-3)', backgroundColor: '#EDF4FC', borderRadius: 'var(--radius-sm)', fontSize: 'var(--font-size-sm)', color: '#1E3A8A', marginBottom: 'var(--space-4)' }}>
               ✓ All system mutations, role approvals, transitions, and user events are permanently committed to an immutable write-once ledger.
             </div>
+
+            {/* Filter Pills */}
+            <div style={{ display: 'flex', gap: '8px', marginBottom: 'var(--space-4)' }}>
+              <button
+                type="button"
+                onClick={() => setLogFilter('ALL')}
+                style={{
+                  padding: '4px 12px',
+                  borderRadius: '16px',
+                  border: '1px solid var(--color-border)',
+                  backgroundColor: logFilter === 'ALL' ? 'var(--color-primary)' : '#FFF',
+                  color: logFilter === 'ALL' ? '#FFF' : 'var(--color-text)',
+                  fontSize: '12px',
+                  fontWeight: 600,
+                  cursor: 'pointer',
+                }}
+              >
+                All Records ({auditLogs.length})
+              </button>
+              <button
+                type="button"
+                onClick={() => setLogFilter('HUMAN')}
+                style={{
+                  padding: '4px 12px',
+                  borderRadius: '16px',
+                  border: '1px solid #93C5FD',
+                  backgroundColor: logFilter === 'HUMAN' ? '#1D4ED8' : '#EFF6FF',
+                  color: logFilter === 'HUMAN' ? '#FFF' : '#1E40AF',
+                  fontSize: '12px',
+                  fontWeight: 600,
+                  cursor: 'pointer',
+                }}
+              >
+                👤 Human Officer Decisions ({auditLogs.filter((l) => l.event_type === 'HUMAN' || l.is_human_decision).length})
+              </button>
+              <button
+                type="button"
+                onClick={() => setLogFilter('SYSTEM')}
+                style={{
+                  padding: '4px 12px',
+                  borderRadius: '16px',
+                  border: '1px solid #CBD5E1',
+                  backgroundColor: logFilter === 'SYSTEM' ? '#475569' : '#F1F5F9',
+                  color: logFilter === 'SYSTEM' ? '#FFF' : '#334155',
+                  fontSize: '12px',
+                  fontWeight: 600,
+                  cursor: 'pointer',
+                }}
+              >
+                ⚙️ System & AI Events ({auditLogs.filter((l) => l.event_type === 'SYSTEM' || l.is_system_event).length})
+              </button>
+            </div>
+
+            {/* Live Audit Log Ledger Table */}
+            {auditLoading ? (
+              <div style={{ padding: 'var(--space-4)', textAlign: 'center', color: 'var(--color-muted)' }}>
+                Loading live immutable audit ledger...
+              </div>
+            ) : auditLogs.length === 0 ? (
+              <div style={{ padding: 'var(--space-4)', textAlign: 'center', color: 'var(--color-muted)' }}>
+                No audit ledger entries found.
+              </div>
+            ) : (
+              <div style={{ overflowX: 'auto' }}>
+                <table style={{ width: '100%', borderCollapse: 'collapse', textAlign: 'left', fontSize: 'var(--font-size-sm)' }}>
+                  <thead>
+                    <tr style={{ borderBottom: '2px solid var(--color-border)', backgroundColor: '#F8FAFC' }}>
+                      <th style={{ padding: '8px 10px', fontWeight: 600, color: 'var(--color-muted)' }}>Audit ID</th>
+                      <th style={{ padding: '8px 10px', fontWeight: 600, color: 'var(--color-muted)' }}>Event Type</th>
+                      <th style={{ padding: '8px 10px', fontWeight: 600, color: 'var(--color-muted)' }}>Action</th>
+                      <th style={{ padding: '8px 10px', fontWeight: 600, color: 'var(--color-muted)' }}>Project / Entity</th>
+                      <th style={{ padding: '8px 10px', fontWeight: 600, color: 'var(--color-muted)' }}>Actor & Role</th>
+                      <th style={{ padding: '8px 10px', fontWeight: 600, color: 'var(--color-muted)' }}>Reason / Context</th>
+                      <th style={{ padding: '8px 10px', fontWeight: 600, color: 'var(--color-muted)' }}>Timestamp</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {auditLogs
+                      .filter((l) => {
+                        const isHuman = l.event_type === 'HUMAN' || l.is_human_decision;
+                        if (logFilter === 'HUMAN') return isHuman;
+                        if (logFilter === 'SYSTEM') return !isHuman;
+                        return true;
+                      })
+                      .map((log) => {
+                        const isHuman = log.event_type === 'HUMAN' || log.is_human_decision;
+                        return (
+                          <tr key={log.audit_id || log._id} style={{ borderBottom: '1px solid var(--color-border)' }}>
+                            <td style={{ padding: '8px 10px', fontFamily: 'monospace', fontSize: '11px' }}>{log.audit_id}</td>
+                            <td style={{ padding: '8px 10px' }}>
+                              <span
+                                style={{
+                                  fontSize: '11px',
+                                  fontWeight: 700,
+                                  padding: '2px 6px',
+                                  borderRadius: '4px',
+                                  backgroundColor: isHuman ? '#DBEAFE' : '#E2E8F0',
+                                  color: isHuman ? '#1E40AF' : '#334155',
+                                }}
+                              >
+                                {isHuman ? '👤 Human' : '⚙️ System'}
+                              </span>
+                            </td>
+                            <td style={{ padding: '8px 10px', fontFamily: 'monospace', fontSize: '12px', fontWeight: 600 }}>
+                              {log.action}
+                            </td>
+                            <td style={{ padding: '8px 10px', fontSize: '12px' }}>
+                              {log.project_id ? <strong>{log.project_id}</strong> : `${log.entity_type}: ${log.entity_id}`}
+                            </td>
+                            <td style={{ padding: '8px 10px', fontSize: '12px' }}>
+                              <code>{log.actor_user_id || log.user_id}</code> ({log.role})
+                            </td>
+                            <td style={{ padding: '8px 10px', fontSize: '12px', maxWidth: '220px' }}>
+                              {log.reason || '—'}
+                            </td>
+                            <td style={{ padding: '8px 10px', color: 'var(--color-muted)', fontSize: '11px', whiteSpace: 'nowrap' }}>
+                              {new Date(log.timestamp).toLocaleString('en-IN')}
+                            </td>
+                          </tr>
+                        );
+                      })}
+                  </tbody>
+                </table>
+              </div>
+            )}
           </Card>
         </div>
       )}

@@ -740,3 +740,37 @@ AI compares, detects anomalies, calculates/receives risk signals, explains findi
   - Authoritative Risk Score: Phase 9 AI Risk Score (`LOW`, `MEDIUM`, `HIGH`) remains the sole authoritative project risk indicator. No parallel or competing risk scores created.
   - Admin Isolation: Administrators receive HTTP 403 `ADMIN_ISOLATION` on all systemic business intelligence endpoints and panels per `rules.md` §10.
 
+## Phase 15: Audit, Traceability & Quality Assurance (SIH Problem Statement 26102)
+- **Status**: Complete
+- **Date**: 2026-09-10
+- **Done Checklist**:
+  - [x] **AI Events ≠ Human Decisions Separation** (`rules.md` §12, `phases_doc.md` Phase 15):
+    - Added `event_type` (`'HUMAN'`, `'SYSTEM'`), `actor_user_id`, and `request_id` to `AuditLog` schema (`backend-node/src/models/AuditLog.js`).
+    - Extended `AUDIT_ENTITY_TYPES` to include `'AI_ANALYSIS'`, `'SUITABILITY'`, and `'COMPLIANCE'`.
+    - Automated background operations and degraded telemetry (`AI_ANALYSIS_COMPLETED`, `AI_ANALYSIS_UNAVAILABLE`, `SUITABILITY_CALCULATED`) are strictly logged with `event_type: 'SYSTEM'` and `actor_user_id: 'SYSTEM'`.
+    - Administrative actions (`PROJECT_RECOMMENDED`, `OFFICER_SANCTION`, `PAYMENT_APPROVED`, etc.) are logged with `event_type: 'HUMAN'` and the officer's `user_id`.
+  - [x] **Write-Once Append-Only Immutability** (`rules.md` §9, `architecture.md` §10.1):
+    - Applied Mongoose `appendOnlyPlugin` to `AuditLog` model to reject any in-place updates or deletions at the database layer.
+    - Router-level guards return HTTP 403 `IMMUTABLE_RECORD` on all mutation methods (`PUT`, `PATCH`, `DELETE`) for `/api/audit/*` and `/api/projects/:id/audit`.
+    - Direct `POST /api/audit` is blocked with HTTP 403 `IMMUTABLE_RECORD` to guarantee that audit events are generated solely via domain service hooks.
+  - [x] **Request Correlation & End-to-End Traceability**:
+    - Request correlation ID (`req.id` / `X-Request-Id`) is threaded through middleware into audit records for end-to-end operational traceability.
+    - Project 360 payload (`GET /api/projects/:projectId`) returns the full chronological `audit_trail` array.
+    - Dedicated `GET /api/projects/:projectId/audit` returns the ordered audit trail with full event context.
+  - [x] **Strict Admin Isolation & Jurisdictional RBAC** (`rules.md` §10):
+    - `GET /api/audit` and `GET /api/projects/:id/audit` strictly block administrators with HTTP 403 `ADMIN_ISOLATION`.
+    - Cross-jurisdiction boundary checks enforce HTTP 403 `FORBIDDEN_JURISDICTION` for District and State authorities accessing projects outside their mandate.
+    - Dedicated read-only access enabled for `AUDITOR` across system-wide logs and project audit trails.
+  - [x] **Frontend Transparency & User Experience** (`frontend/`):
+    - `ProjectDetailModal.jsx`: Added dedicated Audit tab with filter pills (`All Events`, `Human Decisions`, `System / AI Events`), visual distinction badges (`[👤 Human Officer Decision]` vs `[⚙️ System / AI Event]`), relative/absolute timestamps, and statutory compliance notice.
+    - `AuditorWorkspace.jsx`: Integrated live audit ledger connected to `/api/audit` with filterable actor, action, and event type views.
+  - [x] **Verification & Regression Testing**:
+    - Backend Suite: `tests/backend/auditTraceabilityPhase15.test.js` — **14/14 passing (100%)**.
+    - Frontend Suite: `tests/frontend/phase15AuditTraceability.test.js` — **8/8 passing (100%)**.
+    - Frontend Production Build: **Passes cleanly with 0 errors**.
+- **Notes & Governance Guarantees**:
+  - Human-in-the-Loop: AI recommendations never masquerade as official administrative determinations. All UI screens clearly differentiate advisory telemetry from statutory executive decisions.
+  - Teammate-Delivered Foundation: Reused and verified interoperability with teammate-delivered Phase 13 (Field Verification) and Phase 14 (Ministry Systemic Intelligence).
+  - Next Phase Guardrail: Phase 16 remains unstarted per instructions.
+
+

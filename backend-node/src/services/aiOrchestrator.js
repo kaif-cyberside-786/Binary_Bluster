@@ -11,6 +11,7 @@ const crypto = require('crypto');
 const aiClient = require('./aiClient');
 const riskEngine = require('./riskEngine');
 const aiGateway = require('./aiGateway');
+const auditService = require('./auditService');
 const logger = require('../utils/logger');
 const {
   Project,
@@ -201,6 +202,25 @@ class AiOrchestrator {
     const anyUnavailable = checks.some((c) => !c.available);
     if (anyUnavailable) {
       logger.warn(`AI Analysis for project ${pId} degraded: AI service offline or timed out`);
+      // Phase 15: Record append-only SYSTEM audit event for AI unavailability
+      try {
+        await auditService.recordAuditEvent({
+          actor_user_id: 'SYSTEM',
+          role: 'SYSTEM',
+          event_type: 'SYSTEM',
+          action: 'AI_ANALYSIS_UNAVAILABLE',
+          entity_type: 'PROJECT',
+          entity_id: pId,
+          project_id: pId,
+          reason: 'AI service offline or timed out; system operated in degraded fallback mode',
+          metadata: {
+            fallback: true,
+            triggered_by: user?.user_id || 'SYSTEM_TRIGGER',
+          },
+        });
+      } catch (e) {
+        logger.warn(`Failed to write AI_ANALYSIS_UNAVAILABLE audit log: ${e.message}`);
+      }
       return {
         available: false,
         status: 'AI_ANALYSIS_UNAVAILABLE',
@@ -312,6 +332,30 @@ class AiOrchestrator {
       aiStatus: explanationResult.status,
       flagsCount: storedFlags.length,
     });
+
+    // 14. Phase 15: Record append-only SYSTEM audit event (AI event != human decision)
+    try {
+      await auditService.recordAuditEvent({
+        actor_user_id: 'SYSTEM',
+        role: 'SYSTEM',
+        event_type: 'SYSTEM',
+        action: 'AI_ANALYSIS_COMPLETED',
+        entity_type: 'PROJECT',
+        entity_id: pId,
+        project_id: pId,
+        reason: 'Automated statistical anomaly detection & risk scoring completed',
+        metadata: {
+          analysis_id: analysisId,
+          overall_score: riskAssessment.overall_score,
+          risk_level: riskAssessment.risk_level,
+          ai_status: explanationResult.status,
+          flags_count: storedFlags.length,
+          triggered_by: user?.user_id || 'SYSTEM_TRIGGER',
+        },
+      });
+    } catch (auditErr) {
+      logger.warn(`Failed to write AI_ANALYSIS_COMPLETED audit log: ${auditErr.message}`);
+    }
 
     return {
       available: true,

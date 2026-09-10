@@ -15,6 +15,7 @@ const { handleDocumentUpload, computeFileHash } = require('../middleware/upload'
 const aiOrchestrator = require('../services/aiOrchestrator');
 const executionMonitoringService = require('../services/executionMonitoringService');
 const inspectionQueueService = require('../services/inspectionQueueService');
+const auditService = require('../services/auditService');
 const {
   Project,
   Inspection,
@@ -237,6 +238,7 @@ router.post('/recommendation', authenticate, authorize('MP'), async (req, res, n
         entity_type: 'PROJECT',
         entity_id: projectId,
         project_id: projectId,
+        request_id: req.id || req.headers?.['x-request-id'] || null,
         new_state: {
           status: 'DISTRICT_REVIEW',
           title: project.title,
@@ -534,6 +536,7 @@ router.get('/:projectId', authenticate, async (req, res, next) => {
       aiFindings,
       currentRisk,
       inspections,
+      auditLogs,
     ] = await Promise.all([
       ProjectRecommendation.findOne({ project_id: projectId }).lean(),
       OfficerDecision.find({ project_id: projectId }).sort({ decided_at: -1 }).lean(),
@@ -546,6 +549,7 @@ router.get('/:projectId', authenticate, async (req, res, next) => {
       AiRiskFlag.find({ project_id: projectId }).sort({ created_at: -1 }).lean(),
       AiRiskScore.findOne({ project_id: projectId }).lean(),
       Inspection.find({ project_id: projectId }).sort({ created_at: -1 }).lean(),
+      AuditLog.find({ project_id: projectId }).sort({ timestamp: 1 }).lean(),
     ]);
 
     // Compute overall compliance status
@@ -578,12 +582,46 @@ router.get('/:projectId', authenticate, async (req, res, next) => {
         },
         ai_findings: aiFindings || [],
         current_risk: currentRisk || null,
+        audit_trail: auditLogs || [],
       },
       'Project details retrieved successfully'
     );
   } catch (err) {
     next(err);
   }
+});
+
+/**
+ * GET /api/projects/:projectId/audit
+ * Phase 15: Retrieve ordered chronological audit trail for a specific project
+ * Strictly enforces Admin Isolation (403) and role/jurisdiction boundaries
+ */
+router.get('/:projectId/audit', authenticate, async (req, res, next) => {
+  try {
+    const projectId = req.params.projectId.trim().toUpperCase();
+    const trail = await auditService.getProjectAuditTrail(projectId, req.user);
+    return ApiResponse.success(res, trail, 'Project audit trail retrieved successfully');
+  } catch (err) {
+    if (err.code === 'ADMIN_ISOLATION') {
+      return ApiResponse.forbidden(res, err.message, err.code);
+    }
+    if (err.code === 'FORBIDDEN_JURISDICTION') {
+      return ApiResponse.forbidden(res, err.message, err.code);
+    }
+    if (err.code === 'PROJECT_NOT_FOUND') {
+      return ApiResponse.notFound(res, err.message);
+    }
+    next(err);
+  }
+});
+
+// Phase 15: Immutable Enforcement on /:projectId/audit - block all update/delete mutations
+router.all('/:projectId/audit', (req, res) => {
+  return ApiResponse.forbidden(
+    res,
+    'Audit logs are write-once append-only. Modification and deletion are strictly prohibited per rules.md §9 and architecture.md §10.1.',
+    'IMMUTABLE_RECORD'
+  );
 });
 
 // Mount AI historical intelligence routes (/api/projects/:projectId/ai/...)
@@ -806,11 +844,7 @@ router.get(
  * Official administrative decision on project (Phase 10 Human Decision)
  * Protected: DISTRICT_AUTHORITY, STATE_NODAL_AUTHORITY, MINISTRY (Admin Isolation enforced).
  */
-router.patch(
-  '/:projectId/decision',
-  authenticate,
-  authorize('DISTRICT_AUTHORITY', 'STATE_NODAL_AUTHORITY', 'MINISTRY', 'ADMIN'),
-  async (req, res, next) => {
+const handleProjectDecision = async (req, res, next) => {
     try {
       const { role, jurisdiction, user_id } = req.user;
       const projectId = req.params.projectId.toUpperCase();
@@ -1076,6 +1110,7 @@ router.patch(
           entity_type: 'PROJECT',
           entity_id: projectId,
           project_id: projectId,
+          request_id: req.id || req.headers?.['x-request-id'] || null,
           previous_state: { status: prevStatus },
           new_state: { status: newStatus, updates },
           reason: reason.trim(),
@@ -1141,7 +1176,20 @@ router.patch(
     } catch (err) {
       next(err);
     }
-  }
+};
+
+router.patch(
+  '/:projectId/decision',
+  authenticate,
+  authorize('DISTRICT_AUTHORITY', 'STATE_NODAL_AUTHORITY', 'MINISTRY', 'ADMIN'),
+  handleProjectDecision
+);
+
+router.post(
+  '/:projectId/decision',
+  authenticate,
+  authorize('DISTRICT_AUTHORITY', 'STATE_NODAL_AUTHORITY', 'MINISTRY', 'ADMIN'),
+  handleProjectDecision
 );
 
 // ==========================================
@@ -1230,6 +1278,7 @@ router.post(
         entity_type: 'ENGINEERING_REPORT',
         entity_id: `${projectId}-V${nextVersion}`,
         project_id: projectId,
+        request_id: req.id || req.headers?.['x-request-id'] || null,
         previous_state: latestReport ? { version: latestReport.version, estimate: latestReport.detailed_estimate } : null,
         new_state: { version: nextVersion, detailed_estimate: costNumber },
         reason: `Engineering report version ${nextVersion} submitted by ${req.user.user_id}`,
@@ -1379,6 +1428,7 @@ router.post(
         entity_type: 'PROGRESS',
         entity_id: progressId,
         project_id: projectId,
+        request_id: req.id || req.headers?.['x-request-id'] || null,
         previous_state: { stage: project.status },
         new_state: { percent_complete: percent, stage },
         reason: `Progress update ${percent}% (${stage}) reported by ${req.user.user_id}`,
@@ -1520,6 +1570,7 @@ router.post(
         entity_type: 'PAYMENT',
         entity_id: paymentId,
         project_id: projectId,
+        request_id: req.id || req.headers?.['x-request-id'] || null,
         previous_state: null,
         new_state: { installment_number: instNumber, amount: amountNumber, status: initialStatus },
         reason: `Payment installment ${instNumber} of ₹${amountNumber} raised with status ${initialStatus}`,
@@ -1662,6 +1713,7 @@ router.patch(
         entity_type: 'PAYMENT',
         entity_id: paymentId,
         project_id: projectId,
+        request_id: req.id || req.headers?.['x-request-id'] || null,
         previous_state: { status: prevStatus },
         new_state: { status, approved_by: req.user.user_id },
         reason: reason.trim(),
@@ -1765,6 +1817,7 @@ router.post(
         entity_type: 'UTILIZATION_CERTIFICATE',
         entity_id: ucId,
         project_id: projectId,
+        request_id: req.id || req.headers?.['x-request-id'] || null,
         previous_state: null,
         new_state: { amount_certified: certAmount, payment_id: targetPaymentId, is_filed: uc.is_filed },
         reason: `Utilization certificate for ₹${certAmount} filed by ${req.user.user_id}`,
@@ -1878,6 +1931,7 @@ router.post(
         entity_type: 'DOCUMENT',
         entity_id: documentId,
         project_id: projectId,
+        request_id: req.id || req.headers?.['x-request-id'] || null,
         previous_state: null,
         new_state: { document_type: documentType, file_name: req.file.originalname, size: req.file.size },
         reason: `Uploaded ${documentType} file: ${req.file.originalname}`,

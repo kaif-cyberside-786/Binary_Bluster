@@ -19,6 +19,9 @@ const AUDIT_ENTITY_TYPES = [
   'DECISION',
   'USER',
   'SYSTEM_CONFIG',
+  'AI_ANALYSIS',
+  'SUITABILITY',
+  'COMPLIANCE',
 ];
 
 const auditLogSchema = new mongoose.Schema(
@@ -80,6 +83,31 @@ const auditLogSchema = new mongoose.Schema(
       default: null,
       trim: true,
     },
+    event_type: {
+      type: String,
+      enum: {
+        values: ['HUMAN', 'SYSTEM'],
+        message: '{VALUE} is not a valid event type (must be HUMAN or SYSTEM)',
+      },
+      default: 'HUMAN',
+      index: true,
+    },
+    actor_user_id: {
+      type: String,
+      default: null,
+      trim: true,
+      index: true,
+    },
+    request_id: {
+      type: String,
+      default: null,
+      trim: true,
+      index: true,
+    },
+    metadata: {
+      type: mongoose.Schema.Types.Mixed,
+      default: {},
+    },
     ip_address: {
       type: String,
       default: null,
@@ -102,8 +130,23 @@ const auditLogSchema = new mongoose.Schema(
   }
 );
 
+auditLogSchema.pre('validate', function (next) {
+  if (!this.actor_user_id && this.user_id) {
+    this.actor_user_id = this.user_id;
+  }
+  if (!this.user_id && this.actor_user_id) {
+    this.user_id = this.actor_user_id;
+  }
+  if (this.user_id === 'SYSTEM' || this.role === 'SYSTEM') {
+    this.event_type = 'SYSTEM';
+  }
+  next();
+});
+
 auditLogSchema.index({ user_id: 1, timestamp: -1 });
 auditLogSchema.index({ entity_type: 1, entity_id: 1, timestamp: -1 });
+auditLogSchema.index({ project_id: 1, timestamp: 1 });
+auditLogSchema.index({ event_type: 1, timestamp: -1 });
 
 auditLogSchema.plugin(appendOnlyPlugin);
 

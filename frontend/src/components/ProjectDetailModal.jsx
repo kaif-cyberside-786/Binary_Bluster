@@ -40,6 +40,7 @@ export function ProjectDetailModal({
   const [paymentApprovalTarget, setPaymentApprovalTarget] = useState(null); // { payment, action: 'APPROVED' | 'REJECTED' }
   const [approvalReason, setApprovalReason] = useState('');
   const [actionSubmitting, setActionSubmitting] = useState(false);
+  const [auditFilter, setAuditFilter] = useState('ALL'); // 'ALL' | 'HUMAN' | 'SYSTEM'
 
   const fetchProject360 = useCallback(async () => {
     if (!projectId) return;
@@ -79,6 +80,7 @@ export function ProjectDetailModal({
   const documents = data?.documents || [];
   const aiFindings = data?.ai_findings || [];
   const inspections = data?.inspections || [];
+  const auditTrail = data?.audit_trail || [];
 
   const isAgency = user?.role === 'IMPLEMENTING_AGENCY';
   const isDistrict = user?.role === 'DISTRICT_AUTHORITY';
@@ -1255,6 +1257,63 @@ export function ProjectDetailModal({
                   {decisions.length === 0 ? (
                     <div style={{ padding: '24px', textAlign: 'center', color: 'var(--color-muted)', border: '1px dashed var(--color-border)', borderRadius: 'var(--radius-sm)' }}>
                       No official administrative decisions logged on this project yet.
+              {/* TAB 6: DECISIONS & AUDIT TRAIL (Phase 15 Traceability & Governance Enhanced) */}
+              {activeTab === 'decisions' && (() => {
+                // Unified event normalization
+                const unifiedTrail = auditTrail.length > 0
+                  ? auditTrail.map((item) => ({
+                      id: item.audit_id || item._id,
+                      eventType: item.event_type || (item.user_id === 'SYSTEM' || item.role === 'SYSTEM' ? 'SYSTEM' : 'HUMAN'),
+                      action: item.action,
+                      actor: item.actor_user_id || item.user_id,
+                      role: item.role,
+                      reason: item.reason,
+                      prevState: item.previous_state,
+                      newState: item.new_state,
+                      metadata: item.metadata || {},
+                      requestId: item.request_id,
+                      timestamp: item.timestamp || item.created_at,
+                    }))
+                  : decisions.map((d) => ({
+                      id: d.decision_id || d._id,
+                      eventType: 'HUMAN',
+                      action: `OFFICER_${d.decision}`,
+                      actor: d.officer_id,
+                      role: d.role || 'DISTRICT_AUTHORITY',
+                      reason: d.reason,
+                      supportingNote: d.supporting_note,
+                      prevState: d.previous_state,
+                      newState: d.new_state,
+                      metadata: {
+                        risk_score: d.risk_score_at_decision,
+                        risk_level: d.risk_level_at_decision,
+                        risk_analysis_id: d.risk_analysis_id,
+                      },
+                      timestamp: d.decided_at || d.created_at,
+                    }));
+
+                const humanEvents = unifiedTrail.filter((e) => e.eventType === 'HUMAN');
+                const systemEvents = unifiedTrail.filter((e) => e.eventType === 'SYSTEM');
+
+                const displayedEvents = unifiedTrail.filter((e) => {
+                  if (auditFilter === 'HUMAN') return e.eventType === 'HUMAN';
+                  if (auditFilter === 'SYSTEM') return e.eventType === 'SYSTEM';
+                  return true;
+                });
+
+                return (
+                  <div>
+                    {/* Title & Statutory Subtitle */}
+                    <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 'var(--space-3)' }}>
+                      <div>
+                        <h4 style={{ margin: 0, color: 'var(--color-primary)' }}>Administrative Audit Trail & Governance History</h4>
+                        <div style={{ fontSize: '11px', color: 'var(--color-muted)', marginTop: '2px' }}>
+                          Immutable append-only statutory record • Section 12 Governance Boundary
+                        </div>
+                      </div>
+                      <span style={{ fontSize: '11px', color: 'var(--color-muted)', fontFamily: 'monospace' }}>
+                        Total Events: {unifiedTrail.length}
+                      </span>
                     </div>
                   ) : (
                     <div style={{ display: 'flex', flexDirection: 'column', gap: '10px' }}>
@@ -1286,13 +1345,174 @@ export function ProjectDetailModal({
                             <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', marginBottom: '6px' }}>
                               <div style={{ display: 'flex', alignItems: 'center', gap: '8px', flexWrap: 'wrap' }}>
                                 <span
+                    {/* Statutory Governance Disclaimer Banner */}
+                    <div
+                      style={{
+                        padding: '10px 14px',
+                        backgroundColor: '#FEF3C7',
+                        borderLeft: '4px solid #D97706',
+                        borderRadius: 'var(--radius-sm)',
+                        fontSize: '12px',
+                        color: '#92400E',
+                        marginBottom: 'var(--space-4)',
+                        lineHeight: 1.4,
+                      }}
+                    >
+                      <strong>⚖ Statutory Governance Principle:</strong> AI anomaly scores and automated analysis events are strictly advisory. Only authorized statutory officers possess legal decision authority under MPLADS Guidelines. Automated system events never constitute administrative sanction, rejection, or hold decisions.
+                    </div>
+
+                    {/* Filter Pills */}
+                    <div style={{ display: 'flex', gap: '8px', marginBottom: 'var(--space-4)', flexWrap: 'wrap' }}>
+                      <button
+                        type="button"
+                        onClick={() => setAuditFilter('ALL')}
+                        style={{
+                          padding: '4px 12px',
+                          borderRadius: '16px',
+                          border: '1px solid var(--color-border)',
+                          backgroundColor: auditFilter === 'ALL' ? 'var(--color-primary)' : '#FFF',
+                          color: auditFilter === 'ALL' ? '#FFF' : 'var(--color-text)',
+                          fontSize: '12px',
+                          fontWeight: 600,
+                          cursor: 'pointer',
+                        }}
+                      >
+                        All Records ({unifiedTrail.length})
+                      </button>
+                      <button
+                        type="button"
+                        onClick={() => setAuditFilter('HUMAN')}
+                        style={{
+                          padding: '4px 12px',
+                          borderRadius: '16px',
+                          border: '1px solid #93C5FD',
+                          backgroundColor: auditFilter === 'HUMAN' ? '#1D4ED8' : '#EFF6FF',
+                          color: auditFilter === 'HUMAN' ? '#FFF' : '#1E40AF',
+                          fontSize: '12px',
+                          fontWeight: 600,
+                          cursor: 'pointer',
+                        }}
+                      >
+                        👤 Human Officer Decisions ({humanEvents.length})
+                      </button>
+                      <button
+                        type="button"
+                        onClick={() => setAuditFilter('SYSTEM')}
+                        style={{
+                          padding: '4px 12px',
+                          borderRadius: '16px',
+                          border: '1px solid #CBD5E1',
+                          backgroundColor: auditFilter === 'SYSTEM' ? '#475569' : '#F1F5F9',
+                          color: auditFilter === 'SYSTEM' ? '#FFF' : '#334155',
+                          fontSize: '12px',
+                          fontWeight: 600,
+                          cursor: 'pointer',
+                        }}
+                      >
+                        ⚙️ System & AI Events ({systemEvents.length})
+                      </button>
+                    </div>
+
+                    {/* Timeline List */}
+                    {displayedEvents.length === 0 ? (
+                      <div style={{ padding: '24px', textAlign: 'center', color: 'var(--color-muted)', border: '1px dashed var(--color-border)', borderRadius: 'var(--radius-sm)' }}>
+                        No {auditFilter === 'ALL' ? '' : auditFilter.toLowerCase()} audit records recorded for this project yet.
+                      </div>
+                    ) : (
+                      <div style={{ display: 'flex', flexDirection: 'column', gap: '10px' }}>
+                        {displayedEvents.map((evt, idx) => {
+                          const isHuman = evt.eventType === 'HUMAN';
+                          const cardBorderColor = isHuman ? '#2563EB' : '#64748B';
+                          const badgeBg = isHuman ? '#2563EB' : '#475569';
+
+                          return (
+                            <div
+                              key={evt.id || idx}
+                              style={{
+                                border: '1px solid var(--color-border)',
+                                borderLeft: `4px solid ${cardBorderColor}`,
+                                borderRadius: 'var(--radius-sm)',
+                                padding: '12px 14px',
+                                backgroundColor: isHuman ? '#FAFCFF' : '#F8FAFC',
+                              }}
+                            >
+                              {/* Header Row: Badge, Action, Timestamp */}
+                              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', marginBottom: '6px', flexWrap: 'wrap', gap: '6px' }}>
+                                <div style={{ display: 'flex', alignItems: 'center', gap: '8px', flexWrap: 'wrap' }}>
+                                  {/* Distinct Event Type Badge */}
+                                  <span
+                                    style={{
+                                      fontWeight: 700,
+                                      color: '#FFFFFF',
+                                      backgroundColor: badgeBg,
+                                      padding: '2px 8px',
+                                      borderRadius: '4px',
+                                      fontSize: '11px',
+                                      letterSpacing: '0.3px',
+                                    }}
+                                  >
+                                    {isHuman ? '👤 Human Officer Decision' : '⚙️ System / AI Event'}
+                                  </span>
+
+                                  {/* Action Label */}
+                                  <span style={{ fontSize: '12px', color: 'var(--color-text)', fontWeight: 700, fontFamily: 'monospace' }}>
+                                    {evt.action}
+                                  </span>
+
+                                  {/* State Transition if present */}
+                                  {evt.prevState && evt.newState && (
+                                    <span style={{ fontSize: '11px', color: 'var(--color-muted)' }}>
+                                      ({typeof evt.prevState === 'object' ? evt.prevState.status : evt.prevState} →{' '}
+                                      {typeof evt.newState === 'object' ? evt.newState.status : evt.newState})
+                                    </span>
+                                  )}
+                                </div>
+
+                                <span style={{ fontSize: '11px', color: 'var(--color-muted)' }}>
+                                  {new Date(evt.timestamp).toLocaleString('en-IN')}
+                                </span>
+                              </div>
+
+                              {/* Reason / Substantive Justification */}
+                              {evt.reason && (
+                                <div style={{ fontSize: '12px', color: 'var(--color-text)', marginBottom: '6px' }}>
+                                  <strong>{isHuman ? 'Official Justification:' : 'Execution Context:'}</strong> {evt.reason}
+                                </div>
+                              )}
+
+                              {/* Supporting internal note */}
+                              {evt.supportingNote && (
+                                <div
                                   style={{
                                     fontWeight: 700,
                                     color: '#FFFFFF',
                                     backgroundColor: decisionColor,
                                     padding: '2px 8px',
-                                    borderRadius: '4px',
                                     fontSize: '11px',
+                                    color: 'var(--color-muted)',
+                                    backgroundColor: '#F1F5F9',
+                                    padding: '6px 10px',
+                                    borderRadius: '4px',
+                                    marginBottom: '6px',
+                                  }}
+                                >
+                                  <strong>Internal Officer Note:</strong> {evt.supportingNote}
+                                </div>
+                              )}
+
+                              {/* Risk Snapshot if present in metadata */}
+                              {(evt.metadata?.risk_score !== undefined && evt.metadata?.risk_score !== null) && (
+                                <div
+                                  style={{
+                                    display: 'flex',
+                                    alignItems: 'center',
+                                    gap: '8px',
+                                    fontSize: '11px',
+                                    padding: '4px 8px',
+                                    backgroundColor: '#FFFFFF',
+                                    borderRadius: '4px',
+                                    border: '1px solid var(--color-border)',
+                                    marginBottom: '6px',
                                   }}
                                 >
                                   {d.decision}
@@ -1305,6 +1525,15 @@ export function ProjectDetailModal({
                                 {new Date(d.decided_at || d.created_at).toLocaleString('en-IN')}
                               </span>
                             </div>
+                                  <span style={{ color: 'var(--color-muted)' }}>AI Risk Snapshot:</span>
+                                  <RiskBadge level={evt.metadata.risk_level || 'LOW'} score={evt.metadata.risk_score} />
+                                  {evt.metadata.risk_analysis_id && (
+                                    <span style={{ fontSize: '10px', color: 'var(--color-muted)', marginLeft: 'auto' }}>
+                                      Ref: <code>{evt.metadata.risk_analysis_id}</code>
+                                    </span>
+                                  )}
+                                </div>
+                              )}
 
                             <div style={{ fontSize: '12px', color: 'var(--color-text)', marginBottom: '6px' }}>
                               <strong>Official Reason:</strong> {d.reason}
@@ -1346,12 +1575,28 @@ export function ProjectDetailModal({
                                   <span style={{ fontSize: '10px', color: 'var(--color-muted)', marginLeft: 'auto' }}>
                                     Snapshot Ref: <code>{d.risk_analysis_id}</code>
                                   </span>
+                              {/* Footer: Actor, Role, Request ID */}
+                              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', fontSize: '11px', color: 'var(--color-muted)', marginTop: '4px', flexWrap: 'wrap', gap: '6px' }}>
+                                <div>
+                                  {isHuman ? 'Authorized Officer:' : 'System Component:'}{' '}
+                                  <code>{evt.actor || 'SYSTEM'}</code> ({evt.role || 'SYSTEM'})
+                                </div>
+                                {evt.requestId && (
+                                  <div>
+                                    Request ID: <code style={{ fontSize: '10px' }}>{evt.requestId.slice(0, 8)}...</code>
+                                  </div>
                                 )}
                               </div>
                             )}
 
                             <div style={{ fontSize: '11px', color: 'var(--color-muted)' }}>
                               Authorized Officer: <code>{d.officer_id}</code> ({d.role || 'DISTRICT_AUTHORITY'})
+                              {/* Advisory Note on System Events */}
+                              {!isHuman && (
+                                <div style={{ fontSize: '10px', color: 'var(--color-muted)', fontStyle: 'italic', marginTop: '4px', borderTop: '1px dashed #CBD5E1', paddingTop: '4px' }}>
+                                  Advisory system telemetry — does not constitute administrative sanction or holding.
+                                </div>
+                              )}
                             </div>
                           </div>
                         );
@@ -1360,6 +1605,13 @@ export function ProjectDetailModal({
                   )}
                 </div>
               )}
+                          );
+                        })}
+                      </div>
+                    )}
+                  </div>
+                );
+              })()}
             </>
           )}
         </div>

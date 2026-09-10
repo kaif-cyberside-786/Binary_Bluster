@@ -168,7 +168,7 @@ class SystemicIntelligenceService {
                   $and: [
                     { $eq: ['$project_id', '$$pId'] },
                     { $eq: ['$status', 'NON_COMPLIANT'] },
-                    { $eq: ['$is_active', true] },
+                    { $ne: ['$is_dismissed', true] },
                   ],
                 },
               },
@@ -353,7 +353,7 @@ class SystemicIntelligenceService {
                   $and: [
                     { $eq: ['$project_id', '$$pId'] },
                     { $eq: ['$status', 'NON_COMPLIANT'] },
-                    { $eq: ['$is_active', true] },
+                    { $ne: ['$is_dismissed', true] },
                   ],
                 },
               },
@@ -556,7 +556,7 @@ class SystemicIntelligenceService {
                   $and: [
                     { $eq: ['$project_id', '$$pId'] },
                     { $eq: ['$status', 'NON_COMPLIANT'] },
-                    { $eq: ['$is_active', true] },
+                    { $ne: ['$is_dismissed', true] },
                   ],
                 },
               },

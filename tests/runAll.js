@@ -7,8 +7,7 @@ const path = require('path');
 // Ensure modules from backend-node/node_modules are resolvable
 module.paths.push(path.resolve(__dirname, '../backend-node/node_modules'));
 
-const { run } = require('node:test');
-const { spec } = require('node:test/reporters');
+const { spawnSync } = require('child_process');
 
 const testFiles = [
   path.resolve(__dirname, 'backend/health.test.js'),
@@ -28,6 +27,7 @@ const testFiles = [
   path.resolve(__dirname, 'backend/agencyIntelligencePhase12.test.js'),
   path.resolve(__dirname, 'backend/inspectionQueuePhase13.test.js'),
   path.resolve(__dirname, 'backend/systemicIntelligencePhase14.test.js'),
+  path.resolve(__dirname, 'backend/auditTraceabilityPhase15.test.js'),
   path.resolve(__dirname, 'frontend/designTokens.test.js'),
   path.resolve(__dirname, 'frontend/authAndRouting.test.js'),
   path.resolve(__dirname, 'frontend/phase4Workspaces.test.js'),
@@ -39,17 +39,51 @@ const testFiles = [
   path.resolve(__dirname, 'frontend/phase12AgencyIntelligence.test.js'),
   path.resolve(__dirname, 'frontend/inspectionQueuePhase13Frontend.test.js'),
   path.resolve(__dirname, 'frontend/systemicIntelligencePhase14Frontend.test.js'),
+  path.resolve(__dirname, 'frontend/phase15AuditTraceability.test.js'),
 ];
 
 console.log('Running MPLADS Test Suites (Backend + Frontend)...');
+console.log(`Total suites to execute: ${testFiles.length}\n`);
 
-const testStream = run({ files: testFiles, concurrency: 1 });
+let passedCount = 0;
+let failedCount = 0;
+const failedFiles = [];
 
-testStream
-  .compose(new spec())
-  .pipe(process.stdout);
+for (const file of testFiles) {
+  const relPath = path.relative(path.resolve(__dirname, '..'), file);
+  process.stdout.write(`▶ Running ${relPath}... `);
+  const start = Date.now();
+  const res = spawnSync(process.execPath, ['--test', file], {
+    env: { ...process.env, NODE_ENV: 'test' },
+    encoding: 'utf8',
+  });
+  const duration = ((Date.now() - start) / 1000).toFixed(2);
+  if (res.status === 0) {
+    passedCount++;
+    console.log(`✔ PASS (${duration}s)`);
+  } else {
+    failedCount++;
+    failedFiles.push(relPath);
+    console.log(`✖ FAIL (${duration}s)`);
+    if (res.stdout) console.log(res.stdout);
+    if (res.stderr) console.error(res.stderr);
+  }
+}
 
-testStream.on('test:fail', () => {
-  process.exitCode = 1;
-});
+console.log('\n=========================================');
+console.log(`Test Execution Summary:`);
+console.log(`  Passed Suites: ${passedCount}/${testFiles.length}`);
+console.log(`  Failed Suites: ${failedCount}/${testFiles.length}`);
+if (failedFiles.length > 0) {
+  console.log(`  Failing Files:`);
+  failedFiles.forEach((f) => console.log(`    - ${f}`));
+}
+console.log('=========================================\n');
+
+if (failedCount > 0) {
+  process.exit(1);
+} else {
+  process.exit(0);
+}
+
 
