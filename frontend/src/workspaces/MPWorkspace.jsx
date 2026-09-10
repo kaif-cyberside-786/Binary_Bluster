@@ -452,7 +452,7 @@ export function MPWorkspace() {
                     <th style={{ padding: '10px 12px', fontWeight: 600, color: 'var(--color-muted)' }}>Project ID</th>
                     <th style={{ padding: '10px 12px', fontWeight: 600, color: 'var(--color-muted)' }}>Work Title</th>
                     <th style={{ padding: '10px 12px', fontWeight: 600, color: 'var(--color-muted)' }}>Category</th>
-                    <th style={{ padding: '10px 12px', fontWeight: 600, color: 'var(--color-muted)' }}>Estimated Cost</th>
+                    <th style={{ padding: '10px 12px', fontWeight: 600, color: 'var(--color-muted)' }}>Cost / Outlay</th>
                     <th style={{ padding: '10px 12px', fontWeight: 600, color: 'var(--color-muted)' }}>Date</th>
                     <th style={{ padding: '10px 12px', fontWeight: 600, color: 'var(--color-muted)' }}>Status</th>
                     <th style={{ padding: '10px 12px', fontWeight: 600, color: 'var(--color-muted)' }}>Action</th>
@@ -465,7 +465,12 @@ export function MPWorkspace() {
                       <td style={{ padding: '12px', maxWidth: '280px', fontWeight: 500 }}>{p.title}</td>
                       <td style={{ padding: '12px' }}>{p.category}</td>
                       <td style={{ padding: '12px', fontWeight: 600 }}>
-                        ₹{(p.estimated_cost || 0).toLocaleString('en-IN')}
+                        <div>₹{((p.sanctioned_cost != null && p.sanctioned_cost > 0 ? p.sanctioned_cost : p.estimated_cost) || 0).toLocaleString('en-IN')}</div>
+                        {p.sanctioned_cost && p.sanctioned_cost !== p.estimated_cost && (
+                          <div style={{ fontSize: '11px', color: 'var(--color-muted)', fontWeight: 400 }}>
+                            Est: ₹{(p.estimated_cost || 0).toLocaleString('en-IN')}
+                          </div>
+                        )}
                       </td>
                       <td style={{ padding: '12px', color: 'var(--color-muted)', whiteSpace: 'nowrap' }}>
                         {new Date(p.created_at).toLocaleDateString('en-IN')}

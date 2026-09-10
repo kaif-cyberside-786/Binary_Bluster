@@ -21,7 +21,6 @@ export function MinistryWorkspace() {
     { label: 'Geographic Breakdown', key: 'geographic' },
     { label: 'Sectoral & Categories', key: 'categories' },
     { label: 'Agency Concentration', key: 'agency-concentration' },
-    { label: 'Pan-India Overview', key: 'overview' },
     { label: 'State Distributions', key: 'states' },
     { label: 'Inspection System Health', key: 'inspections' },
     { label: 'Supervisory Attention List', key: 'attention' },
@@ -111,19 +110,31 @@ export function MinistryWorkspace() {
 
           <Card title="Total Monitored Works" subtitle="Platform-wide">
             <div style={{ fontSize: '26px', fontWeight: 700, color: 'var(--color-primary)' }}>
-              {counts.total_projects || 0}
+              {loading ? '...' : (counts.total_projects || 0)}
             </div>
             <div style={{ fontSize: '12px', color: 'var(--color-muted)', marginTop: '4px' }}>
-              Under Review: <strong>{counts.under_review || 0}</strong> • Sanctioned: <strong>{counts.sanctioned || 0}</strong>
+              {loading ? (
+                'Syncing national portfolio...'
+              ) : counts.total_projects === 0 ? (
+                <span style={{ fontStyle: 'italic' }}>No projects currently logged across state databases</span>
+              ) : (
+                <>Under Review: <strong>{counts.under_review || 0}</strong> • Sanctioned: <strong>{counts.sanctioned || 0}</strong></>
+              )}
             </div>
           </Card>
 
           <Card title="Completed Works" subtitle="National Delivery">
             <div style={{ fontSize: '26px', fontWeight: 700, color: 'var(--color-success)' }}>
-              {counts.completed || 0}
+              {loading ? '...' : (counts.completed || 0)}
             </div>
             <div style={{ fontSize: '12px', color: 'var(--color-muted)', marginTop: '4px' }}>
-              In Progress: <strong>{counts.in_progress || 0}</strong>
+              {loading ? (
+                'Loading status...'
+              ) : counts.total_projects === 0 ? (
+                <span style={{ fontStyle: 'italic' }}>Awaiting initial project completions</span>
+              ) : (
+                <>In Progress: <strong>{counts.in_progress || 0}</strong></>
+              )}
             </div>
           </Card>
         </div>

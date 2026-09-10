@@ -146,12 +146,10 @@ export function AuditorWorkspace() {
       {/* Permanent Log Records Dedicated Panel */}
       {activeSection === 'logs' && (
         <div style={{ marginBottom: 'var(--space-6)' }}>
-          <Card title="Permanent Write-Once Audit Ledger" subtitle="Immutable audit trail & tamper-evident history">
           <Card title="Permanent Write-Once Audit Ledger" subtitle="Immutable audit trail & tamper-evident history per rules.md §9">
             <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(220px, 1fr))', gap: 'var(--space-4)', marginBottom: 'var(--space-4)' }}>
               <div style={{ padding: 'var(--space-3)', backgroundColor: '#F8FAFC', borderRadius: 'var(--radius-sm)', border: '1px solid var(--color-border)' }}>
                 <div style={{ fontSize: '11px', color: 'var(--color-muted)', fontWeight: 600 }}>TOTAL LEDGER ENTRIES</div>
-                <div style={{ fontSize: '22px', fontWeight: 700, color: 'var(--color-success)', marginTop: '4px' }}>{metrics.total_audit_logs || 0}</div>
                 <div style={{ fontSize: '22px', fontWeight: 700, color: 'var(--color-success)', marginTop: '4px' }}>{metrics.total_audit_logs || auditLogs.length}</div>
               </div>
               <div style={{ padding: 'var(--space-3)', backgroundColor: '#F8FAFC', borderRadius: 'var(--radius-sm)', border: '1px solid var(--color-border)' }}>
@@ -163,7 +161,6 @@ export function AuditorWorkspace() {
                 <div style={{ fontSize: '22px', fontWeight: 700, color: 'var(--color-primary)', marginTop: '4px' }}>APPEND-ONLY ✓</div>
               </div>
             </div>
-            <div style={{ padding: 'var(--space-3)', backgroundColor: '#EDF4FC', borderRadius: 'var(--radius-sm)', fontSize: 'var(--font-size-sm)', color: '#1E3A8A' }}>
             <div style={{ padding: 'var(--space-3)', backgroundColor: '#EDF4FC', borderRadius: 'var(--radius-sm)', fontSize: 'var(--font-size-sm)', color: '#1E3A8A', marginBottom: 'var(--space-4)' }}>
               ✓ All system mutations, role approvals, transitions, and user events are permanently committed to an immutable write-once ledger.
             </div>

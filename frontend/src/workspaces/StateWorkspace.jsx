@@ -28,8 +28,6 @@ export function StateWorkspace() {
     { label: '1% Physical Inspection', key: 'inspections' },
     { label: 'Supervisory Attention', key: 'attention' },
     { label: 'State-wide Projects', key: 'projects' },
-    { label: '1% Physical Inspection', key: 'inspections' },
-    { label: 'District Comparisons', key: 'districts' },
   ];
 
   const fetchStateData = useCallback(async () => {

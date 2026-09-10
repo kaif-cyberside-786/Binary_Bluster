@@ -1245,18 +1245,6 @@ export function ProjectDetailModal({
                 </div>
               )}
 
-              {/* TAB 6: DECISIONS & AUDIT TRAIL (Phase 10 Enhanced) */}
-              {activeTab === 'decisions' && (
-                <div>
-                  <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 'var(--space-3)' }}>
-                    <h4 style={{ margin: 0, color: 'var(--color-primary)' }}>Administrative Audit Trail & Decisions</h4>
-                    <span style={{ fontSize: '11px', color: 'var(--color-muted)' }}>
-                      Immutable append-only statutory record
-                    </span>
-                  </div>
-                  {decisions.length === 0 ? (
-                    <div style={{ padding: '24px', textAlign: 'center', color: 'var(--color-muted)', border: '1px dashed var(--color-border)', borderRadius: 'var(--radius-sm)' }}>
-                      No official administrative decisions logged on this project yet.
               {/* TAB 6: DECISIONS & AUDIT TRAIL (Phase 15 Traceability & Governance Enhanced) */}
               {activeTab === 'decisions' && (() => {
                 // Unified event normalization
@@ -1315,36 +1303,7 @@ export function ProjectDetailModal({
                         Total Events: {unifiedTrail.length}
                       </span>
                     </div>
-                  ) : (
-                    <div style={{ display: 'flex', flexDirection: 'column', gap: '10px' }}>
-                      {decisions.map((d, idx) => {
-                        const decisionColor =
-                          d.decision === 'SANCTION'
-                            ? 'var(--color-success)'
-                            : d.decision === 'HOLD'
-                            ? '#B8860B'
-                            : d.decision === 'REQUEST_CLARIFICATION'
-                            ? 'var(--color-secondary)'
-                            : d.decision === 'ORDER_INSPECTION'
-                            ? '#C2410C'
-                            : d.decision === 'ESCALATE'
-                            ? '#7C3AED'
-                            : 'var(--color-primary)';
 
-                        return (
-                          <div
-                            key={d.decision_id || idx}
-                            style={{
-                              border: '1px solid var(--color-border)',
-                              borderLeft: `4px solid ${decisionColor}`,
-                              borderRadius: 'var(--radius-sm)',
-                              padding: '12px 14px',
-                              backgroundColor: '#FAFAFA',
-                            }}
-                          >
-                            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', marginBottom: '6px' }}>
-                              <div style={{ display: 'flex', alignItems: 'center', gap: '8px', flexWrap: 'wrap' }}>
-                                <span
                     {/* Statutory Governance Disclaimer Banner */}
                     <div
                       style={{
@@ -1484,10 +1443,6 @@ export function ProjectDetailModal({
                               {evt.supportingNote && (
                                 <div
                                   style={{
-                                    fontWeight: 700,
-                                    color: '#FFFFFF',
-                                    backgroundColor: decisionColor,
-                                    padding: '2px 8px',
                                     fontSize: '11px',
                                     color: 'var(--color-muted)',
                                     backgroundColor: '#F1F5F9',
@@ -1512,19 +1467,8 @@ export function ProjectDetailModal({
                                     backgroundColor: '#FFFFFF',
                                     borderRadius: '4px',
                                     border: '1px solid var(--color-border)',
-                                    marginBottom: '6px',
                                   }}
                                 >
-                                  {d.decision}
-                                </span>
-                                <span style={{ fontSize: '12px', color: 'var(--color-text)', fontWeight: 600 }}>
-                                  {d.previous_state} → {d.new_state}
-                                </span>
-                              </div>
-                              <span style={{ fontSize: '11px', color: 'var(--color-muted)' }}>
-                                {new Date(d.decided_at || d.created_at).toLocaleString('en-IN')}
-                              </span>
-                            </div>
                                   <span style={{ color: 'var(--color-muted)' }}>AI Risk Snapshot:</span>
                                   <RiskBadge level={evt.metadata.risk_level || 'LOW'} score={evt.metadata.risk_score} />
                                   {evt.metadata.risk_analysis_id && (
@@ -1535,46 +1479,6 @@ export function ProjectDetailModal({
                                 </div>
                               )}
 
-                            <div style={{ fontSize: '12px', color: 'var(--color-text)', marginBottom: '6px' }}>
-                              <strong>Official Reason:</strong> {d.reason}
-                            </div>
-
-                            {d.supporting_note && (
-                              <div
-                                style={{
-                                  fontSize: '11px',
-                                  color: 'var(--color-muted)',
-                                  backgroundColor: '#F1F5F9',
-                                  padding: '6px 10px',
-                                  borderRadius: '4px',
-                                  marginBottom: '6px',
-                                }}
-                              >
-                                <strong>Internal Officer Note:</strong> {d.supporting_note}
-                              </div>
-                            )}
-
-                            {/* Phase 10: Risk Context Snapshot at Decision */}
-                            {(d.risk_score_at_decision !== undefined && d.risk_score_at_decision !== null) && (
-                              <div
-                                style={{
-                                  display: 'flex',
-                                  alignItems: 'center',
-                                  gap: '8px',
-                                  fontSize: '11px',
-                                  padding: '4px 8px',
-                                  backgroundColor: '#F8FAFC',
-                                  borderRadius: '4px',
-                                  border: '1px solid var(--color-border)',
-                                  marginBottom: '6px',
-                                }}
-                              >
-                                <span style={{ color: 'var(--color-muted)' }}>AI Risk at Decision:</span>
-                                <RiskBadge level={d.risk_level_at_decision || 'LOW'} score={d.risk_score_at_decision} />
-                                {d.risk_analysis_id && (
-                                  <span style={{ fontSize: '10px', color: 'var(--color-muted)', marginLeft: 'auto' }}>
-                                    Snapshot Ref: <code>{d.risk_analysis_id}</code>
-                                  </span>
                               {/* Footer: Actor, Role, Request ID */}
                               <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', fontSize: '11px', color: 'var(--color-muted)', marginTop: '4px', flexWrap: 'wrap', gap: '6px' }}>
                                 <div>
@@ -1587,10 +1491,7 @@ export function ProjectDetailModal({
                                   </div>
                                 )}
                               </div>
-                            )}
 
-                            <div style={{ fontSize: '11px', color: 'var(--color-muted)' }}>
-                              Authorized Officer: <code>{d.officer_id}</code> ({d.role || 'DISTRICT_AUTHORITY'})
                               {/* Advisory Note on System Events */}
                               {!isHuman && (
                                 <div style={{ fontSize: '10px', color: 'var(--color-muted)', fontStyle: 'italic', marginTop: '4px', borderTop: '1px dashed #CBD5E1', paddingTop: '4px' }}>
@@ -1598,13 +1499,6 @@ export function ProjectDetailModal({
                                 </div>
                               )}
                             </div>
-                          </div>
-                        );
-                      })}
-                    </div>
-                  )}
-                </div>
-              )}
                           );
                         })}
                       </div>

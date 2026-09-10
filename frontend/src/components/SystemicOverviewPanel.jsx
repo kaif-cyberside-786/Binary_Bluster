@@ -98,8 +98,7 @@ export function SystemicOverviewPanel({ authFetch, scope = 'ministry', state = n
             {data?.scope === 'ministry' ? 'National Portfolio Intelligence • Pan-India Rollup' : `State Portfolio Intelligence • ${data?.state}`}
           </div>
           <div style={{ fontSize: 'var(--font-size-base)', fontWeight: 600, color: 'var(--color-primary)', marginTop: '2px' }}>
-            Systemic Risk & Value-at-Risk Supervisory Summary
-            Systemic Risk & Value-at-Risk (Supervisory Advisory Summary)
+            Systemic Risk &amp; Value-at-Risk (Supervisory Advisory Summary)
           </div>
         </div>
         <div style={{ fontSize: '12px', color: 'var(--color-muted)' }}>

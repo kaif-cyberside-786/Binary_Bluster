@@ -771,6 +771,55 @@ AI compares, detects anomalies, calculates/receives risk signals, explains findi
 - **Notes & Governance Guarantees**:
   - Human-in-the-Loop: AI recommendations never masquerade as official administrative determinations. All UI screens clearly differentiate advisory telemetry from statutory executive decisions.
   - Teammate-Delivered Foundation: Reused and verified interoperability with teammate-delivered Phase 13 (Field Verification) and Phase 14 (Ministry Systemic Intelligence).
-  - Next Phase Guardrail: Phase 16 remains unstarted per instructions.
+
+## Phase 16: Final UI Polish, SIH Demo & Deployment (SIH Problem Statement 26102)
+- **Status**: Complete
+- **Date**: 2026-09-10
+- **Done Checklist**:
+  - [x] **UI Polish & Navigation Deduplication** (`design.md` §5.65):
+    - `frontend/src/components/Footer.jsx`: Removed "Phase 1 Foundation"; replaced with official branding: `"SIH Problem Statement 26102 Prototype • AI Risk Monitoring & Decision Support Platform"`.
+    - `frontend/src/workspaces/StateWorkspace.jsx`: Removed duplicate sidebar nav items ("1% Physical Inspection" & "District Comparisons").
+    - `frontend/src/workspaces/MinistryWorkspace.jsx`: Removed duplicate nav item ("Pan-India Overview" colliding with "Portfolio Overview").
+    - `frontend/src/components/SystemicOverviewPanel.jsx`: Cleaned up duplicate header text line; now displays single clean header `"Systemic Risk & Value-at-Risk (Supervisory Advisory Summary)"`.
+    - `frontend/src/components/DistrictReviewModal.jsx`: Cleaned up concatenated agency assignment label; provided editable approved sanction outlay amount input pre-filled with estimated cost and included in decision payload.
+    - `frontend/src/workspaces/MPWorkspace.jsx`: Updated works table cost column header to `"Cost / Outlay"` and display `(p.sanctioned_cost || p.estimated_cost)` with consistent outlay formatting matching the District Workspace.
+  - [x] **Demo Authentication & Role Alignment**:
+    - Updated `seedUsers.js` to seed both official MoSPI identifiers (`ADMIN001`, `MP-IND-01`, `DA-IND-01`, `AG-PWD-01`, `SA-MP-01`, `MIN-DIID-01`, `AUD-CAG-01`) and quick-login demo button aliases (`USR-ADMIN-01`, `USR-MP-01`, `USR-DIST-01`, `USR-AGENCY-01`, `USR-STATE-01`, `USR-MINISTRY-01`, `USR-AUDITOR-01`).
+    - Standard demo password unified: `Demo@12345`.
+  - [x] **Synthetic Demo Data Seeder & Pipeline Integrity** (`rules.md` §12, `phases_doc.md` Phase 16):
+    - Implemented `backend-node/src/utils/seedDemoProjects.js` (and npm script `npm run seed:demo`).
+    - Plants realistic synthetic inputs marked with `is_synthetic: true`:
+      - Cost Anomaly (`PRJ-DEMO-COST-01`): ₹98.5L deep borewell vs ₹18.5L peer median in Drinking Water (5.3x outlier).
+      - Duplicate Work (`PRJ-DEMO-DUP-01` vs `PRJ-DEMO-DUP-00`): 92% title similarity in Community Hall at Vijay Nagar Ward 12.
+      - Payment vs Progress Mismatch (`PRJ-DEMO-PAY-01`): 88.9% disbursed vs 15% physical progress in Roads & Bridges.
+      - Delay / Staleness (`PRJ-DEMO-DELAY-01`): Sanctioned 380 days ago, no progress reported for 190 days in Health.
+      - Clean Baseline (`PRJ-DEMO-CLEAN-01`): On-track school renovation with 45% progress and 40% disbursement.
+      - High Multi-Anomaly Work (`PRJ-DEMO-HIGH-01`): 77/100 composite risk with commercial asset guideline non-compliance.
+      - Statistical peer benchmarks in Indore across categories.
+    - Computes explainable risk via real deterministic `RiskEngine` / `aiOrchestrator`, populates `AiRiskScore`, `AiRiskFlag`, and records append-only `SYSTEM` audit events (`AI_ANALYSIS_COMPLETED`).
+    - Zero hardcoded risk scores or fake AI outputs in UI components.
+  - [x] **Ministry Rollup & Honest Empty States**:
+    - Fixed Ministry KPI cards to handle loading states and display honest empty states when no works exist in scope.
+    - Verified `/api/dashboard/ministry` and `/api/systemic/overview` reflect non-zero monitored works when projects are seeded.
+  - [x] **SIH Demo Walkthrough Script & Deployment Notes**:
+    - Created `docs/sih-demo-script.md` with role credentials table and click-by-click instructions across all 8 user workflows.
+    - Created `docs/DEPLOYMENT.md` with complete installation, architecture topology, production build, and verification commands.
+    - Verified `.env.example` templates contain only non-sensitive placeholders.
+  - [x] **Verification & Hygiene**:
+    - Backend Suite: 215/215 tests passing across 33 test suites.
+    - Frontend Suite: 115/115 tests passing across 12 test suites.
+    - Frontend Production Build: Passes cleanly with 0 errors in ~1.3s.
+    - Zero wholesale rewrites of `projects.js`; `.git/index` untouched; no duplicate files.
+- **Demo User Credentials**:
+  - `MP-IND-01` / `USR-MP-01`: Hon. Member of Parliament (Indore) — `Demo@12345`
+  - `DA-IND-01` / `USR-DIST-01`: District Collector & Magistrate (Indore) — `Demo@12345`
+  - `AG-PWD-01` / `USR-AGENCY-01`: Executive Engineer (RES/PWD Indore) — `Demo@12345`
+  - `SA-MP-01` / `USR-STATE-01`: State Nodal Officer (Madhya Pradesh) — `Demo@12345`
+  - `MIN-DIID-01` / `USR-MINISTRY-01`: Director (DIID, MoSPI, Central) — `Demo@12345`
+  - `AUD-CAG-01` / `USR-AUDITOR-01`: Senior Audit Officer (CAG) — `Demo@12345`
+  - `ADMIN001` / `USR-ADMIN-01`: System Administrator (NIC/MoSPI) — `Demo@12345`
+- **Notes**:
+  - All 16 planned phases (Phases 1 through 16) are now complete and fully operational.
+  - No Phase 17 was created or attempted per instructions.
 
 

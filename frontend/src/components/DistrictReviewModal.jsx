@@ -27,6 +27,7 @@ export function DistrictReviewModal({ projectId, isOpen, onClose, onDecisionReco
   const [decisionReason, setDecisionReason] = useState('');
   const [supportingNote, setSupportingNote] = useState('');
   const [assignedAgencyId, setAssignedAgencyId] = useState('PWD-INDORE-01');
+  const [sanctionCostInput, setSanctionCostInput] = useState('');
   const [submittingDecision, setSubmittingDecision] = useState(false);
   const [decisionError, setDecisionError] = useState(null);
 
@@ -43,6 +44,9 @@ export function DistrictReviewModal({ projectId, isOpen, onClose, onDecisionReco
       setReviewData(body.data);
       if (body.data?.project?.implementing_agency_id) {
         setAssignedAgencyId(body.data.project.implementing_agency_id);
+      }
+      if (body.data?.project) {
+        setSanctionCostInput(String(body.data.project.sanctioned_cost || body.data.project.estimated_cost || ''));
       }
     } catch (err) {
       setError(err.message || 'Error fetching review package');
@@ -125,6 +129,7 @@ export function DistrictReviewModal({ projectId, isOpen, onClose, onDecisionReco
         reason: decisionReason.trim(),
         supporting_note: supportingNote.trim() || undefined,
         implementing_agency_id: pendingDecision === 'SANCTION' ? assignedAgencyId : undefined,
+        sanctioned_cost: pendingDecision === 'SANCTION' && sanctionCostInput ? Number(sanctionCostInput) : undefined,
       };
 
       const res = await authFetch(`/api/projects/${projectId}/decision`, {
@@ -1055,7 +1060,6 @@ export function DistrictReviewModal({ projectId, isOpen, onClose, onDecisionReco
                       </div>
 
                       <label style={{ display: 'block', fontSize: '12px', fontWeight: 600, marginBottom: '4px' }}>
-                        Assign Implementing Agency *
                         Selected Implementing Agency (Administrative Assignment) *
                       </label>
                       <select
@@ -1078,6 +1082,29 @@ export function DistrictReviewModal({ projectId, isOpen, onClose, onDecisionReco
                       </select>
                       <div style={{ fontSize: '11px', color: 'var(--color-muted)', marginTop: '4px' }}>
                         * Advisory suggestion pre-fills this selection. You may choose any eligible agency before signing sanction approval.
+                      </div>
+
+                      <div style={{ marginTop: 'var(--space-4)' }}>
+                        <label style={{ display: 'block', fontSize: '12px', fontWeight: 600, marginBottom: '4px' }}>
+                          Approved Sanction Outlay (₹) *
+                        </label>
+                        <input
+                          type="number"
+                          value={sanctionCostInput}
+                          onChange={(e) => setSanctionCostInput(e.target.value)}
+                          placeholder="Approved outlay amount"
+                          style={{
+                            width: '100%',
+                            padding: '8px',
+                            borderRadius: '4px',
+                            border: '1px solid var(--color-border)',
+                            fontSize: '13px',
+                            backgroundColor: '#FFFFFF',
+                          }}
+                        />
+                        <div style={{ fontSize: '11px', color: 'var(--color-muted)', marginTop: '4px' }}>
+                          Pre-populated with estimated cost (₹{(project?.estimated_cost || 0).toLocaleString('en-IN')}). District Authority may confirm or adjust the formal sanctioned outlay.
+                        </div>
                       </div>
                     </div>
                   )}

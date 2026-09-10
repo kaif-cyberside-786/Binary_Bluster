@@ -99,7 +99,7 @@ export function Footer() {
             © 2026 Ministry of Statistics & Programme Implementation (MoSPI) • Government of India
           </div>
           <div>
-            SIH Problem Statement 26102 Prototype • Phase 1 Foundation
+            SIH Problem Statement 26102 Prototype • AI Risk Monitoring &amp; Decision Support Platform
           </div>
         </div>
       </div>
