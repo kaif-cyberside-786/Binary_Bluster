@@ -679,3 +679,64 @@ AI compares, detects anomalies, calculates/receives risk signals, explains findi
   - Distinction between Risk Score and Inspection Priority preserved: Phase 9 Risk Score remains authoritative; Phase 13 Inspection Priority blends Risk, Compliance, Execution, and Officer triggers into an actionable operational queue.
   - Human-in-the-loop strictly enforced: AI recommends candidates, but human officers assign, schedule, conduct visits, and record results.
   - Admin Isolation verified: Admins receive 403 `ADMIN_ISOLATION` and cannot access inspection records.
+
+## Phase 14: Ministry Systemic Intelligence & Portfolio Analytics (SIH Problem Statement 26102 / PARAKH)
+- **Status**: Complete
+- **Date**: 2026-09-10
+- **Implemented Features**:
+  - Systemic Intelligence Service (`backend-node/src/services/systemicIntelligenceService.js`):
+    - RBAC & Jurisdiction validation (`_validateScope`):
+      - `MINISTRY`: Full Pan-India national visibility with optional `?state=` and `?year=` drilldowns.
+      - `STATE_NODAL_AUTHORITY`: Strictly bound to authenticated State from JWT (`user.jurisdiction.state`). Attempting to request another state via `?state=` returns HTTP 403 `FORBIDDEN_JURISDICTION`.
+      - `ADMIN`: Strict Admin Isolation returning HTTP 403 `ADMIN_ISOLATION` on all systemic business intelligence endpoints per `rules.md` §10.
+      - `DISTRICT_AUTHORITY`, `MP`, `IMPLEMENTING_AGENCY`: Returns HTTP 403 `FORBIDDEN_ROLE`.
+      - `AUDITOR`: Read-only access within authorized jurisdiction scope.
+    - Value-at-Risk & Portfolio Overview (`getPortfolioOverview`):
+      - Aggregates total monitored outlay, active and completed project counts.
+      - Calculates Value-at-Risk: `high_risk_value`, `non_compliant_value`, and deduplicated union `total_at_risk_value` with `at_risk_percentage` (preventing double-counting for projects that are simultaneously HIGH risk and NON_COMPLIANT).
+      - Phase 9 authoritative risk distribution (`LOW`, `MEDIUM`, `HIGH`, `UNASSESSED`) and `high_risk_rate`.
+      - Full canonical 10-status project lifecycle distribution.
+    - Geographic Breakdown (`getGeographicBreakdown`):
+      - Grouping dimension `STATE` for Ministry (national rollup) and `DISTRICT` for State (district comparative breakdown).
+      - Computes project counts, total outlay, average risk score, high-risk count, non-compliant count, and completed count per region.
+    - Sectoral & Category Expenditure Patterns (`getCategoryPatterns`):
+      - Rollup across canonical MPLADS categories (`Drinking Water`, `Education`, `Electricity`, `Health & Family Welfare`, `Irrigation`, `Other Public Facilities`, `Roads & Bridges`, `Sanitation`).
+      - Aggregates total outlay, category outlay share %, project count, and high-risk project rate per category.
+    - Systemic Agency Concentration (`getAgencyConcentrationSystemic`):
+      - Integrates Phase 12 agency intelligence to compute Herfindahl-Hirschman Index (HHI) and concentration guardrails (>35% outlay threshold).
+      - Strictly isolates systemic portfolio concentration from District-level agency suitability ranking.
+    - Inspection System Health (`getInspectionSystemHealth`):
+      - Aggregates canonical 7-stage field inspection lifecycle tally (`RECOMMENDED`, `PENDING_DECISION`, `ASSIGNED`, `SCHEDULED`, `IN_PROGRESS`, `COMPLETED`, `RESULT_RECORDED`).
+      - Ground verification outcome distribution (`NO_ISSUE`, `REVIEW_REQUIRED`, `ESCALATE`).
+      - State 1% physical inspection quota tracking under Guidelines §5.2.
+    - Systemic Attention List (`getAttentionList`):
+      - Transparent 4-factor supervisory formula:
+        $$\text{AttentionScore} = 0.40 \times \text{HighRiskRate} + 0.25 \times \text{NonCompliantRate} + 0.20 \times \text{ExecutionGapRate} + 0.15 \times \text{InspectionEscalationRate}$$
+      - Deterministic ranking with human-interpretable risk drivers.
+  - Backend Systemic Routes (`backend-node/src/routes/systemic.js` mounted at `/api/systemic` in `backend-node/src/routes/index.js`):
+    - `GET /api/systemic/overview`
+    - `GET /api/systemic/geographic`
+    - `GET /api/systemic/categories`
+    - `GET /api/systemic/agency-concentration`
+    - `GET /api/systemic/inspections`
+    - `GET /api/systemic/attention`
+    - All routes enforce authentication, RBAC, Admin Isolation (403), State boundary validation (403), and read-only non-mutating safety.
+  - Frontend Components & Workspaces (`frontend/`):
+    - `SystemicOverviewPanel.jsx`: Top-line KPI summary cards, Value-at-Risk exposure, Phase 9 risk distribution, canonical lifecycle breakdown, and supervisory advisory disclaimer banner.
+    - `SystemicGeographicPanel.jsx`: Regional comparative breakdown (State-by-State or District-by-District), dynamic state drill-down dropdown with reset option.
+    - `SystemicCategoryPanel.jsx`: Cross-category expenditure table with outlay shares, counts, and category risk rates.
+    - `SystemicInspectionHealthPanel.jsx`: 7-stage lifecycle display, ground verification outcome breakdown, and State 1% statutory quota progress bar.
+    - `SystemicAttentionList.jsx`: Ranked supervisory priority table with transparent formula badge, score bar, priority tiers (`CRITICAL`, `ELEVATED`, `MONITOR`, `ROUTINE`), and key systemic drivers.
+    - `MinistryWorkspace.jsx`: Connected all 8 navigation items (`overview`, `geographic`, `categories`, `agency-concentration`, `inspections`, `attention`, `projects`, `alerts`) mounting systemic panels.
+    - `StateWorkspace.jsx`: Connected all 8 navigation items with State-scoped context (`user.jurisdiction.state`).
+  - Automated Tests & Verification:
+    - `tests/backend/systemicIntelligencePhase14.test.js`: **25/25 passing** (all 25 backend criteria verified).
+    - `tests/frontend/systemicIntelligencePhase14Frontend.test.js`: **10/10 passing** (all 10 frontend criteria verified).
+    - Unified test suite (`node tests/runAll.js`): **301/301 passing across 42 suites with 0 failures**.
+    - Python AI Service (`py -m unittest discover -s ai-service/tests`): **20/20 passing**.
+    - Frontend Production Build (`npm --prefix frontend run build`): **Passes with 0 errors in 2.25s (76 modules transformed)**.
+- **Notes & Core Invariants Preserved**:
+  - Supervisory/Advisory Only: Phase 14 intelligence is strictly observational and advisory for policy decisions. The AI never auto-sanctions, auto-holds, or alters project states.
+  - Authoritative Risk Score: Phase 9 AI Risk Score (`LOW`, `MEDIUM`, `HIGH`) remains the sole authoritative project risk indicator. No parallel or competing risk scores created.
+  - Admin Isolation: Administrators receive HTTP 403 `ADMIN_ISOLATION` on all systemic business intelligence endpoints and panels per `rules.md` §10.
+

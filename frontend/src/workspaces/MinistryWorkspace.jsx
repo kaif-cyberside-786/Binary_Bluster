@@ -3,6 +3,11 @@ import { useAuth } from '../context/AuthContext';
 import WorkspaceLayout from './WorkspaceLayout';
 import Card from '../components/Card';
 import AgencyConcentrationPanel from '../components/AgencyConcentrationPanel';
+import SystemicOverviewPanel from '../components/SystemicOverviewPanel';
+import SystemicGeographicPanel from '../components/SystemicGeographicPanel';
+import SystemicCategoryPanel from '../components/SystemicCategoryPanel';
+import SystemicInspectionHealthPanel from '../components/SystemicInspectionHealthPanel';
+import SystemicAttentionList from '../components/SystemicAttentionList';
 
 export function MinistryWorkspace() {
   const { user, authFetch } = useAuth();
@@ -12,9 +17,14 @@ export function MinistryWorkspace() {
 
   const navItems = [
     { label: 'National Dashboard', key: 'dashboard' },
-    { label: 'Agency Concentration', key: 'concentration' },
+    { label: 'Portfolio Overview', key: 'overview' },
+    { label: 'Geographic Breakdown', key: 'geographic' },
+    { label: 'Sectoral & Categories', key: 'categories' },
+    { label: 'Agency Concentration', key: 'agency-concentration' },
     { label: 'Pan-India Overview', key: 'overview' },
     { label: 'State Distributions', key: 'states' },
+    { label: 'Inspection System Health', key: 'inspections' },
+    { label: 'Supervisory Attention List', key: 'attention' },
     { label: 'Supervision & Policy', key: 'policy' },
   ];
 
@@ -144,8 +154,43 @@ export function MinistryWorkspace() {
         </div>
       )}
 
+      {/* Portfolio Overview & Value-at-Risk */}
+      {(activeSection === 'overview' || activeSection === 'dashboard') && (
+        <div style={{ marginBottom: 'var(--space-6)' }}>
+          <SystemicOverviewPanel authFetch={authFetch} scope="ministry" />
+        </div>
+      )}
+
+      {/* Geographic Breakdown Panel */}
+      {activeSection === 'geographic' && (
+        <div style={{ marginBottom: 'var(--space-6)' }}>
+          <SystemicGeographicPanel authFetch={authFetch} scope="ministry" />
+        </div>
+      )}
+
+      {/* Sectoral & Category Patterns */}
+      {activeSection === 'categories' && (
+        <div style={{ marginBottom: 'var(--space-6)' }}>
+          <SystemicCategoryPanel authFetch={authFetch} />
+        </div>
+      )}
+
+      {/* Inspection System Health */}
+      {activeSection === 'inspections' && (
+        <div style={{ marginBottom: 'var(--space-6)' }}>
+          <SystemicInspectionHealthPanel authFetch={authFetch} />
+        </div>
+      )}
+
+      {/* Supervisory Attention List */}
+      {activeSection === 'attention' && (
+        <div style={{ marginBottom: 'var(--space-6)' }}>
+          <SystemicAttentionList authFetch={authFetch} />
+        </div>
+      )}
+
       {/* Agency Concentration Systemic Analytics Panel (Phase 12, PRD §12.7) */}
-      {(activeSection === 'concentration' || activeSection === 'dashboard') && (
+      {(activeSection === 'agency-concentration' || activeSection === 'concentration' || activeSection === 'dashboard') && (
         <div style={{ marginBottom: 'var(--space-6)' }}>
           <AgencyConcentrationPanel
             district="Indore"

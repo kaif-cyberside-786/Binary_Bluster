@@ -54,4 +54,8 @@ router.use('/agencies', agencyRoutes);
 const inspectionRoutes = require('./inspections');
 router.use('/inspections', inspectionRoutes);
 
+// Mount systemic intelligence & portfolio analytics routes (/api/systemic/...)
+const systemicRoutes = require('./systemic');
+router.use('/systemic', systemicRoutes);
+
 module.exports = router;

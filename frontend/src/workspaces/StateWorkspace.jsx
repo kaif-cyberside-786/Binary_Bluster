@@ -4,6 +4,11 @@ import WorkspaceLayout from './WorkspaceLayout';
 import Card from '../components/Card';
 import AgencyConcentrationPanel from '../components/AgencyConcentrationPanel';
 import InspectionQueueCard from '../components/InspectionQueueCard';
+import SystemicOverviewPanel from '../components/SystemicOverviewPanel';
+import SystemicGeographicPanel from '../components/SystemicGeographicPanel';
+import SystemicCategoryPanel from '../components/SystemicCategoryPanel';
+import SystemicInspectionHealthPanel from '../components/SystemicInspectionHealthPanel';
+import SystemicAttentionList from '../components/SystemicAttentionList';
 
 export function StateWorkspace() {
   const { user, authFetch } = useAuth();
@@ -16,7 +21,12 @@ export function StateWorkspace() {
 
   const navItems = [
     { label: 'State Dashboard', key: 'dashboard' },
+    { label: 'Portfolio Overview', key: 'overview' },
+    { label: 'District Comparisons', key: 'districts' },
+    { label: 'Sectoral Patterns', key: 'categories' },
     { label: 'Agency Concentration', key: 'concentration' },
+    { label: '1% Physical Inspection', key: 'inspections' },
+    { label: 'Supervisory Attention', key: 'attention' },
     { label: 'State-wide Projects', key: 'projects' },
     { label: '1% Physical Inspection', key: 'inspections' },
     { label: 'District Comparisons', key: 'districts' },
@@ -192,6 +202,11 @@ export function StateWorkspace() {
             </div>
           </Card>
 
+          {/* Systemic Inspection Health Metrics */}
+          <div style={{ marginTop: 'var(--space-6)' }}>
+            <SystemicInspectionHealthPanel authFetch={authFetch} state={state} />
+          </div>
+
           {/* Statewide Prioritized Field Inspection Queue */}
           <div style={{ marginTop: 'var(--space-6)' }}>
             <InspectionQueueCard
@@ -200,6 +215,34 @@ export function StateWorkspace() {
               readOnly={true}
             />
           </div>
+        </div>
+      )}
+
+      {/* State Portfolio Overview & Value-at-Risk */}
+      {(activeSection === 'overview' || activeSection === 'dashboard') && (
+        <div style={{ marginBottom: 'var(--space-6)' }}>
+          <SystemicOverviewPanel authFetch={authFetch} scope="state" state={state} />
+        </div>
+      )}
+
+      {/* District Comparisons Geographic Panel */}
+      {activeSection === 'districts' && (
+        <div style={{ marginBottom: 'var(--space-6)' }}>
+          <SystemicGeographicPanel authFetch={authFetch} scope="state" defaultState={state} />
+        </div>
+      )}
+
+      {/* Sectoral & Category Patterns */}
+      {activeSection === 'categories' && (
+        <div style={{ marginBottom: 'var(--space-6)' }}>
+          <SystemicCategoryPanel authFetch={authFetch} state={state} />
+        </div>
+      )}
+
+      {/* Supervisory Attention List */}
+      {activeSection === 'attention' && (
+        <div style={{ marginBottom: 'var(--space-6)' }}>
+          <SystemicAttentionList authFetch={authFetch} state={state} />
         </div>
       )}
 
@@ -216,16 +259,17 @@ export function StateWorkspace() {
       )}
 
       {/* District Comparisons Table */}
-      <Card
-        title={
-          activeSection === 'districts'
-            ? 'District-wise Implementation Comparisons'
-            : activeSection === 'projects'
-            ? 'State-wide Projects by District'
-            : 'District-wise Implementation Breakdown'
-        }
-        subtitle={`Distribution of projects across ${state} districts`}
-      >
+      {(activeSection === 'dashboard' || activeSection === 'projects' || activeSection === 'districts') && (
+        <Card
+          title={
+            activeSection === 'districts'
+              ? 'District-wise Implementation Comparisons'
+              : activeSection === 'projects'
+              ? 'State-wide Projects by District'
+              : 'District-wise Implementation Breakdown'
+          }
+          subtitle={`Distribution of projects across ${state} districts`}
+        >
         {loading ? (
           <div style={{ padding: 'var(--space-4)', textAlign: 'center', color: 'var(--color-muted)' }}>
             Loading state data...
@@ -261,6 +305,7 @@ export function StateWorkspace() {
           </div>
         )}
       </Card>
+      )}
     </WorkspaceLayout>
   );
 }
