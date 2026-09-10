@@ -7,6 +7,7 @@ export function MinistryWorkspace() {
   const { user, authFetch } = useAuth();
   const [data, setData] = useState(null);
   const [loading, setLoading] = useState(true);
+  const [activeSection, setActiveSection] = useState('dashboard');
 
   const navItems = [
     { label: 'National Dashboard', key: 'dashboard' },
@@ -40,7 +41,12 @@ export function MinistryWorkspace() {
   const stateBreakdown = data?.state_breakdown || [];
 
   return (
-    <WorkspaceLayout roleTitle="Ministry of Statistics & Programme Implementation" navItems={navItems}>
+    <WorkspaceLayout
+      roleTitle="Ministry of Statistics & Programme Implementation"
+      navItems={navItems}
+      activeNavKey={activeSection}
+      onNavSelect={setActiveSection}
+    >
       {/* Header */}
       <div style={{ marginBottom: 'var(--space-6)' }}>
         <div
@@ -64,84 +70,113 @@ export function MinistryWorkspace() {
       </div>
 
       {/* National Scale Cards */}
-      <div
-        style={{
-          display: 'grid',
-          gridTemplateColumns: 'repeat(auto-fit, minmax(220px, 1fr))',
-          gap: 'var(--space-4)',
-          marginBottom: 'var(--space-6)',
-        }}
-      >
-        <Card title="Total Parliamentary Constituencies" subtitle="Official Government Database">
-          <div style={{ fontSize: '26px', fontWeight: 700, color: 'var(--color-primary)' }}>
-            {scale.total_mps || 542}
-          </div>
-          <div style={{ fontSize: '12px', color: 'var(--color-muted)', marginTop: '4px' }}>
-            Real MoSPI Government Records Ingested
-          </div>
-        </Card>
+      {(activeSection === 'dashboard' || activeSection === 'overview') && (
+        <div
+          style={{
+            display: 'grid',
+            gridTemplateColumns: 'repeat(auto-fit, minmax(220px, 1fr))',
+            gap: 'var(--space-4)',
+            marginBottom: 'var(--space-6)',
+          }}
+        >
+          <Card title="Total Parliamentary Constituencies" subtitle="Official Government Database">
+            <div style={{ fontSize: '26px', fontWeight: 700, color: 'var(--color-primary)' }}>
+              {scale.total_mps || 542}
+            </div>
+            <div style={{ fontSize: '12px', color: 'var(--color-muted)', marginTop: '4px' }}>
+              Real MoSPI Government Records Ingested
+            </div>
+          </Card>
 
-        <Card title="National Fund Allocation" subtitle="Cumulative Outlay">
-          <div style={{ fontSize: '26px', fontWeight: 700, color: 'var(--color-secondary)' }}>
-            ₹{((scale.total_allocated_funds || 0) / 10000000).toFixed(0)} <span style={{ fontSize: '14px' }}>Cr</span>
-          </div>
-          <div style={{ fontSize: '12px', color: 'var(--color-muted)', marginTop: '4px' }}>
-            Sanctioned: ₹{((scale.total_sanctioned_funds || 0) / 10000000).toFixed(2)} Cr
-          </div>
-        </Card>
+          <Card title="National Fund Allocation" subtitle="Cumulative Outlay">
+            <div style={{ fontSize: '26px', fontWeight: 700, color: 'var(--color-secondary)' }}>
+              ₹{((scale.total_allocated_funds || 0) / 10000000).toFixed(0)} <span style={{ fontSize: '14px' }}>Cr</span>
+            </div>
+            <div style={{ fontSize: '12px', color: 'var(--color-muted)', marginTop: '4px' }}>
+              Sanctioned: ₹{((scale.total_sanctioned_funds || 0) / 10000000).toFixed(2)} Cr
+            </div>
+          </Card>
 
-        <Card title="Total Monitored Works" subtitle="Platform-wide">
-          <div style={{ fontSize: '26px', fontWeight: 700, color: 'var(--color-primary)' }}>
-            {counts.total_projects || 0}
-          </div>
-          <div style={{ fontSize: '12px', color: 'var(--color-muted)', marginTop: '4px' }}>
-            Under Review: <strong>{counts.under_review || 0}</strong> • Sanctioned: <strong>{counts.sanctioned || 0}</strong>
-          </div>
-        </Card>
+          <Card title="Total Monitored Works" subtitle="Platform-wide">
+            <div style={{ fontSize: '26px', fontWeight: 700, color: 'var(--color-primary)' }}>
+              {counts.total_projects || 0}
+            </div>
+            <div style={{ fontSize: '12px', color: 'var(--color-muted)', marginTop: '4px' }}>
+              Under Review: <strong>{counts.under_review || 0}</strong> • Sanctioned: <strong>{counts.sanctioned || 0}</strong>
+            </div>
+          </Card>
 
-        <Card title="Completed Works" subtitle="National Delivery">
-          <div style={{ fontSize: '26px', fontWeight: 700, color: 'var(--color-success)' }}>
-            {counts.completed || 0}
-          </div>
-          <div style={{ fontSize: '12px', color: 'var(--color-muted)', marginTop: '4px' }}>
-            In Progress: <strong>{counts.in_progress || 0}</strong>
-          </div>
-        </Card>
-      </div>
+          <Card title="Completed Works" subtitle="National Delivery">
+            <div style={{ fontSize: '26px', fontWeight: 700, color: 'var(--color-success)' }}>
+              {counts.completed || 0}
+            </div>
+            <div style={{ fontSize: '12px', color: 'var(--color-muted)', marginTop: '4px' }}>
+              In Progress: <strong>{counts.in_progress || 0}</strong>
+            </div>
+          </Card>
+        </div>
+      )}
+
+      {/* Policy & Supervision Guidelines Panel */}
+      {activeSection === 'policy' && (
+        <div style={{ marginBottom: 'var(--space-6)' }}>
+          <Card title="Central Supervision & Policy Framework" subtitle="MoSPI DIID Oversight Protocols">
+            <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(240px, 1fr))', gap: 'var(--space-4)', marginBottom: 'var(--space-4)' }}>
+              <div style={{ padding: 'var(--space-3)', backgroundColor: '#F8FAFC', borderRadius: 'var(--radius-sm)', border: '1px solid var(--color-border)' }}>
+                <div style={{ fontSize: '12px', fontWeight: 700, color: 'var(--color-primary)' }}>10% District Authority Quota</div>
+                <div style={{ fontSize: '12px', color: 'var(--color-muted)', marginTop: '4px' }}>Mandatory field verification of at least 10% sanctioned works by District Collector (§5.2).</div>
+              </div>
+              <div style={{ padding: 'var(--space-3)', backgroundColor: '#F8FAFC', borderRadius: 'var(--radius-sm)', border: '1px solid var(--color-border)' }}>
+                <div style={{ fontSize: '12px', fontWeight: 700, color: 'var(--color-primary)' }}>1% State Nodal Quota</div>
+                <div style={{ fontSize: '12px', color: 'var(--color-muted)', marginTop: '4px' }}>State planning department annual physical inspection quota across districts (§5.2).</div>
+              </div>
+              <div style={{ padding: 'var(--space-3)', backgroundColor: '#F8FAFC', borderRadius: 'var(--radius-sm)', border: '1px solid var(--color-border)' }}>
+                <div style={{ fontSize: '12px', fontWeight: 700, color: 'var(--color-primary)' }}>Advisory AI Governance</div>
+                <div style={{ fontSize: '12px', color: 'var(--color-muted)', marginTop: '4px' }}>Strict adherence to Rule §12: AI risk scores advise, only authorized human officers decide.</div>
+              </div>
+            </div>
+            <div style={{ padding: 'var(--space-3)', backgroundColor: '#EDF4FC', borderRadius: 'var(--radius-sm)', fontSize: 'var(--font-size-sm)', color: '#1E3A8A' }}>
+              ✓ Central Supervision Active: DIID maintains continuous oversight of fund flow, execution milestones, and audit compliance across all States and Union Territories.
+            </div>
+          </Card>
+        </div>
+      )}
 
       {/* State-by-State Distribution */}
-      <Card title="State & UT Implementation Distribution" subtitle="Consolidated status counts across states">
-        {loading ? (
-          <div style={{ padding: 'var(--space-4)', textAlign: 'center', color: 'var(--color-muted)' }}>
-            Loading national data...
-          </div>
-        ) : stateBreakdown.length === 0 ? (
-          <div style={{ padding: 'var(--space-4)', textAlign: 'center', color: 'var(--color-muted)' }}>
-            No state-level project distributions found yet.
-          </div>
-        ) : (
-          <div style={{ overflowX: 'auto' }}>
-            <table style={{ width: '100%', borderCollapse: 'collapse', textAlign: 'left', fontSize: 'var(--font-size-sm)' }}>
-              <thead>
-                <tr style={{ borderBottom: '2px solid var(--color-border)', backgroundColor: '#F8FAFC' }}>
-                  <th style={{ padding: '10px 12px', fontWeight: 600, color: 'var(--color-muted)' }}>State / UT</th>
-                  <th style={{ padding: '10px 12px', fontWeight: 600, color: 'var(--color-muted)' }}>Total Projects</th>
-                  <th style={{ padding: '10px 12px', fontWeight: 600, color: 'var(--color-muted)' }}>Sanctioned Projects</th>
-                </tr>
-              </thead>
-              <tbody>
-                {stateBreakdown.map((s) => (
-                  <tr key={s.state} style={{ borderBottom: '1px solid var(--color-border)' }}>
-                    <td style={{ padding: '10px 12px', fontWeight: 600 }}>{s.state}</td>
-                    <td style={{ padding: '10px 12px' }}>{s.total_projects}</td>
-                    <td style={{ padding: '10px 12px', color: 'var(--color-success)', fontWeight: 600 }}>{s.sanctioned}</td>
+      {(activeSection === 'dashboard' || activeSection === 'states') && (
+        <Card title="State & UT Implementation Distribution" subtitle="Consolidated status counts across states">
+          {loading ? (
+            <div style={{ padding: 'var(--space-4)', textAlign: 'center', color: 'var(--color-muted)' }}>
+              Loading national data...
+            </div>
+          ) : stateBreakdown.length === 0 ? (
+            <div style={{ padding: 'var(--space-4)', textAlign: 'center', color: 'var(--color-muted)' }}>
+              No state-level project distributions found yet.
+            </div>
+          ) : (
+            <div style={{ overflowX: 'auto' }}>
+              <table style={{ width: '100%', borderCollapse: 'collapse', textAlign: 'left', fontSize: 'var(--font-size-sm)' }}>
+                <thead>
+                  <tr style={{ borderBottom: '2px solid var(--color-border)', backgroundColor: '#F8FAFC' }}>
+                    <th style={{ padding: '10px 12px', fontWeight: 600, color: 'var(--color-muted)' }}>State / UT</th>
+                    <th style={{ padding: '10px 12px', fontWeight: 600, color: 'var(--color-muted)' }}>Total Projects</th>
+                    <th style={{ padding: '10px 12px', fontWeight: 600, color: 'var(--color-muted)' }}>Sanctioned Projects</th>
                   </tr>
-                ))}
-              </tbody>
-            </table>
-          </div>
-        )}
-      </Card>
+                </thead>
+                <tbody>
+                  {stateBreakdown.map((s) => (
+                    <tr key={s.state} style={{ borderBottom: '1px solid var(--color-border)' }}>
+                      <td style={{ padding: '10px 12px', fontWeight: 600 }}>{s.state}</td>
+                      <td style={{ padding: '10px 12px' }}>{s.total_projects}</td>
+                      <td style={{ padding: '10px 12px', color: 'var(--color-success)', fontWeight: 600 }}>{s.sanctioned}</td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
+          )}
+        </Card>
+      )}
     </WorkspaceLayout>
   );
 }

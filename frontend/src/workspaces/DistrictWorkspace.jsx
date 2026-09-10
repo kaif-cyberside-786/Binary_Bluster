@@ -23,6 +23,24 @@ export function DistrictWorkspace() {
   // Status filter
   const [statusFilter, setStatusFilter] = useState('ALL');
 
+  // Sidebar navigation section state
+  const [activeSection, setActiveSection] = useState('dashboard');
+
+  const handleNavSelect = (key) => {
+    setActiveSection(key);
+    if (key === 'queue') {
+      setStatusFilter('DISTRICT_REVIEW');
+    } else if (key === 'sanctioned') {
+      setStatusFilter('SANCTIONED');
+    } else if (key === 'inspections') {
+      setStatusFilter('ALL');
+    } else if (key === 'inventory') {
+      setStatusFilter('ALL');
+    } else if (key === 'dashboard') {
+      setStatusFilter('ALL');
+    }
+  };
+
   // 360 view modal state
   const [selected360ProjectId, setSelected360ProjectId] = useState(null);
 
@@ -144,7 +162,12 @@ export function DistrictWorkspace() {
   const pendingQueue = dashboardData?.pending_queue || [];
 
   return (
-    <WorkspaceLayout roleTitle="District Authority" navItems={navItems}>
+    <WorkspaceLayout
+      roleTitle="District Authority"
+      navItems={navItems}
+      activeNavKey={activeSection}
+      onNavSelect={handleNavSelect}
+    >
       {/* Alert Notices */}
       {successMessage && (
         <div
@@ -208,9 +231,10 @@ export function DistrictWorkspace() {
 
           <div style={{ display: 'flex', gap: 'var(--space-2)' }}>
             <Button
-              variant="primary"
+              variant={activeSection === 'queue' ? 'secondary' : 'primary'}
               size="md"
               onClick={() => {
+                handleNavSelect('queue');
                 const queueElem = document.getElementById('review-queue-section');
                 if (queueElem) queueElem.scrollIntoView({ behavior: 'smooth' });
               }}
@@ -221,116 +245,173 @@ export function DistrictWorkspace() {
         </div>
       </div>
 
-      {/* Workload Metric Cards */}
-      <div
-        style={{
-          display: 'grid',
-          gridTemplateColumns: 'repeat(auto-fit, minmax(220px, 1fr))',
-          gap: 'var(--space-4)',
-          marginBottom: 'var(--space-6)',
-        }}
-      >
-        <Card title="Awaiting Review" subtitle="MP Recommendations">
-          <div style={{ fontSize: '26px', fontWeight: 700, color: 'var(--color-warning)' }}>
-            {counts.pending_review || 0}
-          </div>
-          <div style={{ fontSize: '12px', color: 'var(--color-muted)', marginTop: '4px' }}>
-            Pending Value: ₹{((financial.pending_estimated_cost || 0) / 100000).toFixed(2)} Lakh
-          </div>
-        </Card>
+      {/* Workload Metric Cards - contextual to activeSection */}
+      {(activeSection === 'dashboard' || activeSection === 'sanctioned' || activeSection === 'inspections') && (
+        <div
+          style={{
+            display: 'grid',
+            gridTemplateColumns: 'repeat(auto-fit, minmax(220px, 1fr))',
+            gap: 'var(--space-4)',
+            marginBottom: 'var(--space-6)',
+          }}
+        >
+          {(activeSection === 'dashboard' || activeSection === 'queue') && (
+            <Card title="Awaiting Review" subtitle="MP Recommendations">
+              <div style={{ fontSize: '26px', fontWeight: 700, color: 'var(--color-warning)' }}>
+                {counts.pending_review || 0}
+              </div>
+              <div style={{ fontSize: '12px', color: 'var(--color-muted)', marginTop: '4px' }}>
+                Pending Value: ₹{((financial.pending_estimated_cost || 0) / 100000).toFixed(2)} Lakh
+              </div>
+            </Card>
+          )}
 
-        <Card title="Sanctioned Active" subtitle="Execution phase">
-          <div style={{ fontSize: '26px', fontWeight: 700, color: 'var(--color-success)' }}>
-            {counts.sanctioned || 0}
-          </div>
-          <div style={{ fontSize: '12px', color: 'var(--color-muted)', marginTop: '4px' }}>
-            Sanctioned Value: ₹{((financial.total_sanctioned_cost || 0) / 100000).toFixed(2)} Lakh
-          </div>
-        </Card>
+          {(activeSection === 'dashboard' || activeSection === 'sanctioned') && (
+            <Card title="Sanctioned Active" subtitle="Execution phase">
+              <div style={{ fontSize: '26px', fontWeight: 700, color: 'var(--color-success)' }}>
+                {counts.sanctioned || 0}
+              </div>
+              <div style={{ fontSize: '12px', color: 'var(--color-muted)', marginTop: '4px' }}>
+                Sanctioned Value: ₹{((financial.total_sanctioned_cost || 0) / 100000).toFixed(2)} Lakh
+              </div>
+            </Card>
+          )}
 
-        <Card title="Needs Clarification / Held" subtitle="Exceptions requiring response">
-          <div style={{ fontSize: '26px', fontWeight: 700, color: 'var(--color-error)' }}>
-            {counts.clarification_or_held || 0}
-          </div>
-          <div style={{ fontSize: '12px', color: 'var(--color-muted)', marginTop: '4px' }}>
-            Flagged for MP response
-          </div>
-        </Card>
+          {activeSection === 'dashboard' && (
+            <Card title="Needs Clarification / Held" subtitle="Exceptions requiring response">
+              <div style={{ fontSize: '26px', fontWeight: 700, color: 'var(--color-error)' }}>
+                {counts.clarification_or_held || 0}
+              </div>
+              <div style={{ fontSize: '12px', color: 'var(--color-muted)', marginTop: '4px' }}>
+                Flagged for MP response
+              </div>
+            </Card>
+          )}
 
-        <Card title="10% Statutory Inspection" subtitle="DA Mandatory Quota">
-          <div style={{ fontSize: '13px', color: 'var(--color-text)', marginBottom: '4px' }}>
-            Completed: <strong>{inspections.completed || 0} of {inspections.target_10_percent || 1}</strong>
-          </div>
-          <div style={{ height: '8px', backgroundColor: '#E2E8F0', borderRadius: '4px', overflow: 'hidden' }}>
-            <div
-              style={{
-                width: `${inspections.percentage || 0}%`,
-                height: '100%',
-                backgroundColor: 'var(--color-secondary)',
-              }}
-            />
-          </div>
-          <div style={{ fontSize: '11px', color: 'var(--color-muted)', marginTop: '6px' }}>
-            Target: 10% of total sanctioned works
-          </div>
-        </Card>
-      </div>
+          {(activeSection === 'dashboard' || activeSection === 'inspections') && (
+            <Card title="10% Statutory Inspection" subtitle="DA Mandatory Quota">
+              <div style={{ fontSize: '13px', color: 'var(--color-text)', marginBottom: '4px' }}>
+                Completed: <strong>{inspections.completed || 0} of {inspections.target_10_percent || 1}</strong>
+              </div>
+              <div style={{ height: '8px', backgroundColor: '#E2E8F0', borderRadius: '4px', overflow: 'hidden' }}>
+                <div
+                  style={{
+                    width: `${inspections.percentage || 0}%`,
+                    height: '100%',
+                    backgroundColor: 'var(--color-secondary)',
+                  }}
+                />
+              </div>
+              <div style={{ fontSize: '11px', color: 'var(--color-muted)', marginTop: '6px' }}>
+                Target: 10% of total sanctioned works
+              </div>
+            </Card>
+          )}
+        </div>
+      )}
+
+      {/* 10% Statutory Inspection Quota Dedicated Panel */}
+      {activeSection === 'inspections' && (
+        <div style={{ marginBottom: 'var(--space-6)' }}>
+          <Card title="10% Statutory Inspection Quota Details" subtitle="MPLADS Operational Guidelines Section 5.2 Oversight">
+            <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(200px, 1fr))', gap: 'var(--space-4)', marginBottom: 'var(--space-4)' }}>
+              <div style={{ padding: 'var(--space-3)', backgroundColor: '#F8FAFC', borderRadius: 'var(--radius-sm)', border: '1px solid var(--color-border)' }}>
+                <div style={{ fontSize: '11px', color: 'var(--color-muted)', fontWeight: 600 }}>TOTAL DISTRICT WORKS</div>
+                <div style={{ fontSize: '22px', fontWeight: 700, color: 'var(--color-primary)', marginTop: '4px' }}>{counts.total || 0}</div>
+              </div>
+              <div style={{ padding: 'var(--space-3)', backgroundColor: '#F8FAFC', borderRadius: 'var(--radius-sm)', border: '1px solid var(--color-border)' }}>
+                <div style={{ fontSize: '11px', color: 'var(--color-muted)', fontWeight: 600 }}>MANDATORY 10% QUOTA</div>
+                <div style={{ fontSize: '22px', fontWeight: 700, color: 'var(--color-secondary)', marginTop: '4px' }}>{inspections.target_10_percent || 1} works</div>
+              </div>
+              <div style={{ padding: 'var(--space-3)', backgroundColor: '#F8FAFC', borderRadius: 'var(--radius-sm)', border: '1px solid var(--color-border)' }}>
+                <div style={{ fontSize: '11px', color: 'var(--color-muted)', fontWeight: 600 }}>INSPECTIONS COMPLETED</div>
+                <div style={{ fontSize: '22px', fontWeight: 700, color: 'var(--color-success)', marginTop: '4px' }}>{inspections.completed || 0}</div>
+              </div>
+              <div style={{ padding: 'var(--space-3)', backgroundColor: '#F8FAFC', borderRadius: 'var(--radius-sm)', border: '1px solid var(--color-border)' }}>
+                <div style={{ fontSize: '11px', color: 'var(--color-muted)', fontWeight: 600 }}>QUOTA COMPLIANCE</div>
+                <div style={{ fontSize: '22px', fontWeight: 700, color: inspections.completed >= inspections.target_10_percent ? 'var(--color-success)' : 'var(--color-warning)', marginTop: '4px' }}>
+                  {inspections.percentage || 0}%
+                </div>
+              </div>
+            </div>
+            <div style={{ padding: 'var(--space-3)', backgroundColor: '#EDF4FC', borderRadius: 'var(--radius-sm)', fontSize: 'var(--font-size-sm)', color: '#1E3A8A', lineHeight: 1.5 }}>
+              <strong>Statutory Requirement (Guidelines §5.2):</strong> The District Collector / District Magistrate is statutorily mandated to physically inspect at least 10% of all works implemented in the district annually. Field inspections verify execution quality, physical progress against milestones, and ensure no duplicate works exist on the ground.
+            </div>
+          </Card>
+        </div>
+      )}
 
       {/* Pending Recommendations Queue Section */}
-      <div id="review-queue-section" style={{ marginBottom: 'var(--space-6)' }}>
-        <Card title="Pending Recommendations Queue" subtitle="New proposals awaiting administrative review and sanction">
-          {pendingQueue.length === 0 ? (
-            <div style={{ padding: 'var(--space-4)', textAlign: 'center', color: 'var(--color-muted)' }}>
-              ✓ No pending recommendations requiring District review at this time.
-            </div>
-          ) : (
-            <div style={{ overflowX: 'auto' }}>
-              <table style={{ width: '100%', borderCollapse: 'collapse', textAlign: 'left', fontSize: 'var(--font-size-sm)' }}>
-                <thead>
-                  <tr style={{ borderBottom: '2px solid var(--color-border)', backgroundColor: '#F8FAFC' }}>
-                    <th style={{ padding: '10px 12px', fontWeight: 600, color: 'var(--color-muted)' }}>Project ID</th>
-                    <th style={{ padding: '10px 12px', fontWeight: 600, color: 'var(--color-muted)' }}>Work Title</th>
-                    <th style={{ padding: '10px 12px', fontWeight: 600, color: 'var(--color-muted)' }}>Category</th>
-                    <th style={{ padding: '10px 12px', fontWeight: 600, color: 'var(--color-muted)' }}>Estimated Cost</th>
-                    <th style={{ padding: '10px 12px', fontWeight: 600, color: 'var(--color-muted)' }}>Recommended Date</th>
-                    <th style={{ padding: '10px 12px', fontWeight: 600, color: 'var(--color-muted)' }}>Action</th>
-                  </tr>
-                </thead>
-                <tbody>
-                  {pendingQueue.map((p) => (
-                    <tr key={p.project_id} style={{ borderBottom: '1px solid var(--color-border)' }}>
-                      <td style={{ padding: '12px', fontFamily: 'monospace', fontWeight: 600 }}>{p.project_id}</td>
-                      <td style={{ padding: '12px', maxWidth: '300px', fontWeight: 500 }}>{p.title}</td>
-                      <td style={{ padding: '12px' }}>{p.category}</td>
-                      <td style={{ padding: '12px', fontWeight: 600 }}>
-                        ₹{(p.estimated_cost || 0).toLocaleString('en-IN')}
-                      </td>
-                      <td style={{ padding: '12px', color: 'var(--color-muted)', whiteSpace: 'nowrap' }}>
-                        {new Date(p.created_at).toLocaleDateString('en-IN')}
-                      </td>
-                      <td style={{ padding: '12px' }}>
-                        <Button
-                          size="sm"
-                          variant="primary"
-                          onClick={() => handleOpenReview(p)}
-                          style={{ padding: '4px 10px', fontSize: '11px', fontWeight: 600 }}
-                        >
-                          Review & Decide
-                        </Button>
-                      </td>
+      {(activeSection === 'dashboard' || activeSection === 'queue') && (
+        <div id="review-queue-section" style={{ marginBottom: 'var(--space-6)' }}>
+          <Card title="Pending Recommendations Queue" subtitle="New proposals awaiting administrative review and sanction">
+            {pendingQueue.length === 0 ? (
+              <div style={{ padding: 'var(--space-4)', textAlign: 'center', color: 'var(--color-muted)' }}>
+                ✓ No pending recommendations requiring District review at this time.
+              </div>
+            ) : (
+              <div style={{ overflowX: 'auto' }}>
+                <table style={{ width: '100%', borderCollapse: 'collapse', textAlign: 'left', fontSize: 'var(--font-size-sm)' }}>
+                  <thead>
+                    <tr style={{ borderBottom: '2px solid var(--color-border)', backgroundColor: '#F8FAFC' }}>
+                      <th style={{ padding: '10px 12px', fontWeight: 600, color: 'var(--color-muted)' }}>Project ID</th>
+                      <th style={{ padding: '10px 12px', fontWeight: 600, color: 'var(--color-muted)' }}>Work Title</th>
+                      <th style={{ padding: '10px 12px', fontWeight: 600, color: 'var(--color-muted)' }}>Category</th>
+                      <th style={{ padding: '10px 12px', fontWeight: 600, color: 'var(--color-muted)' }}>Estimated Cost</th>
+                      <th style={{ padding: '10px 12px', fontWeight: 600, color: 'var(--color-muted)' }}>Recommended Date</th>
+                      <th style={{ padding: '10px 12px', fontWeight: 600, color: 'var(--color-muted)' }}>Action</th>
                     </tr>
-                  ))}
-                </tbody>
-              </table>
-            </div>
-          )}
-        </Card>
-      </div>
+                  </thead>
+                  <tbody>
+                    {pendingQueue.map((p) => (
+                      <tr key={p.project_id} style={{ borderBottom: '1px solid var(--color-border)' }}>
+                        <td style={{ padding: '12px', fontFamily: 'monospace', fontWeight: 600 }}>{p.project_id}</td>
+                        <td style={{ padding: '12px', maxWidth: '300px', fontWeight: 500 }}>{p.title}</td>
+                        <td style={{ padding: '12px' }}>{p.category}</td>
+                        <td style={{ padding: '12px', fontWeight: 600 }}>
+                          ₹{(p.estimated_cost || 0).toLocaleString('en-IN')}
+                        </td>
+                        <td style={{ padding: '12px', color: 'var(--color-muted)', whiteSpace: 'nowrap' }}>
+                          {new Date(p.created_at).toLocaleDateString('en-IN')}
+                        </td>
+                        <td style={{ padding: '12px' }}>
+                          <Button
+                            size="sm"
+                            variant="primary"
+                            onClick={() => handleOpenReview(p)}
+                            style={{ padding: '4px 10px', fontSize: '11px', fontWeight: 600 }}
+                          >
+                            Review & Decide
+                          </Button>
+                        </td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+              </div>
+            )}
+          </Card>
+        </div>
+      )}
 
       {/* District Works Inventory with Filter */}
       <Card
-        title="District Works Inventory"
-        subtitle={`All projects within ${district} District`}
+        title={
+          activeSection === 'sanctioned'
+            ? 'Sanctioned Works Inventory'
+            : activeSection === 'inspections'
+            ? 'Works Subject to Inspection Quota'
+            : activeSection === 'queue'
+            ? 'Review Queue Works Inventory'
+            : 'District Works Inventory'
+        }
+        subtitle={
+          activeSection === 'sanctioned'
+            ? `Approved and executing projects within ${district} District`
+            : activeSection === 'inspections'
+            ? `Works within ${district} District eligible for 10% physical verification`
+            : `All projects within ${district} District`
+        }
       >
         {/* Status Filter Bar */}
         <div style={{ display: 'flex', gap: 'var(--space-2)', marginBottom: 'var(--space-4)', flexWrap: 'wrap' }}>

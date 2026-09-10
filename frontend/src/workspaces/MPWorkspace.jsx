@@ -51,6 +51,9 @@ export function MPWorkspace() {
   const [page, setPage] = useState(1);
   const [totalPages, setTotalPages] = useState(1);
 
+  // Sidebar navigation section state
+  const [activeSection, setActiveSection] = useState('dashboard');
+
   const navItems = [
     { label: 'Constituency Dashboard', key: 'dashboard' },
     { label: 'My Recommendations', key: 'recs' },
@@ -187,7 +190,12 @@ export function MPWorkspace() {
     : '14.70';
 
   return (
-    <WorkspaceLayout roleTitle="Hon'ble Member of Parliament" navItems={navItems}>
+    <WorkspaceLayout
+      roleTitle="Hon'ble Member of Parliament"
+      navItems={navItems}
+      activeNavKey={activeSection}
+      onNavSelect={setActiveSection}
+    >
       {/* Alert Notices */}
       {successMessage && (
         <div
@@ -255,122 +263,175 @@ export function MPWorkspace() {
         </div>
       </div>
 
-      {/* Top Metric Cards Grid */}
-      <div
-        style={{
-          display: 'grid',
-          gridTemplateColumns: 'repeat(auto-fit, minmax(220px, 1fr))',
-          gap: 'var(--space-4)',
-          marginBottom: 'var(--space-6)',
-        }}
-      >
-        {/* Real Allocation Card */}
-        <Card title="Constituency Allocation" subtitle={`MoSPI Official Data (${mpInfo?.year || '2024-2025'})`}>
-          <div style={{ fontSize: '26px', fontWeight: 700, color: 'var(--color-primary)' }}>
-            ₹{allocatedCr} <span style={{ fontSize: '14px', fontWeight: 500 }}>Cr</span>
-          </div>
-          <div style={{ fontSize: '12px', color: 'var(--color-muted)', marginTop: '4px' }}>
-            Annual Entitlement: <strong>₹5.00 Cr/Yr</strong>
-          </div>
-          {mpInfo?.is_real_government_data && (
-            <div
-              style={{
-                display: 'inline-block',
-                marginTop: '8px',
-                padding: '2px 6px',
-                backgroundColor: '#EDF4FC',
-                color: 'var(--color-secondary)',
-                borderRadius: 'var(--radius-sm)',
-                fontSize: '10px',
-                fontWeight: 700,
-                letterSpacing: '0.04em',
-                textTransform: 'uppercase',
-              }}
-            >
-              ✓ Real Government Record
-            </div>
-          )}
-        </Card>
-
-        {/* Total Recommendations Card */}
-        <Card title="Total Works" subtitle="Lifecycle progression">
-          <div style={{ fontSize: '26px', fontWeight: 700, color: 'var(--color-primary)' }}>
-            {counts.total || 0}
-          </div>
-          <div style={{ fontSize: '12px', color: 'var(--color-muted)', marginTop: '4px' }}>
-            Under Review: <strong>{counts.district_review || 0}</strong> • Sanctioned: <strong>{counts.sanctioned || 0}</strong>
-          </div>
-        </Card>
-
-        {/* Sanctioned Outlay */}
-        <Card title="Sanctioned Outlay" subtitle="Approved works value">
-          <div style={{ fontSize: '26px', fontWeight: 700, color: 'var(--color-success)' }}>
-            ₹{((financial.total_sanctioned_cost || 0) / 100000).toFixed(2)} <span style={{ fontSize: '14px', fontWeight: 500 }}>Lakh</span>
-          </div>
-          <div style={{ fontSize: '12px', color: 'var(--color-muted)', marginTop: '4px' }}>
-            Estimated Value: ₹{((financial.total_estimated_cost || 0) / 100000).toFixed(2)} Lakh
-          </div>
-        </Card>
-
-        {/* Completion Rate */}
-        <Card title="Completion Rate" subtitle="Physical progress">
-          <div style={{ fontSize: '26px', fontWeight: 700, color: 'var(--color-secondary)' }}>
-            {dashboardData?.completion_rate || 0}%
-          </div>
-          <div style={{ height: '6px', backgroundColor: '#E2E8F0', borderRadius: '3px', marginTop: '10px', overflow: 'hidden' }}>
-            <div
-              style={{
-                width: `${dashboardData?.completion_rate || 0}%`,
-                height: '100%',
-                backgroundColor: 'var(--color-secondary)',
-              }}
-            />
-          </div>
-        </Card>
-      </div>
-
-      {/* Attention Required Section (Derived from Project Status & AI Risk) */}
-      <div style={{ marginBottom: 'var(--space-6)' }}>
-        <Card title="Attention Required" subtitle="Items requiring MP review or clarification">
-          {attention?.attention_count > 0 ? (
-            <div style={{ display: 'flex', flexDirection: 'column', gap: 'var(--space-3)' }}>
-              {attention.items.map((item) => (
+      {/* Top Metric Cards Grid - contextual to activeSection */}
+      {(activeSection === 'dashboard' || activeSection === 'finance' || activeSection === 'works') && (
+        <div
+          style={{
+            display: 'grid',
+            gridTemplateColumns: 'repeat(auto-fit, minmax(220px, 1fr))',
+            gap: 'var(--space-4)',
+            marginBottom: 'var(--space-6)',
+          }}
+        >
+          {/* Real Allocation Card */}
+          {(activeSection === 'dashboard' || activeSection === 'finance') && (
+            <Card title="Constituency Allocation" subtitle={`MoSPI Official Data (${mpInfo?.year || '2024-2025'})`}>
+              <div style={{ fontSize: '26px', fontWeight: 700, color: 'var(--color-primary)' }}>
+                ₹{allocatedCr} <span style={{ fontSize: '14px', fontWeight: 500 }}>Cr</span>
+              </div>
+              <div style={{ fontSize: '12px', color: 'var(--color-muted)', marginTop: '4px' }}>
+                Annual Entitlement: <strong>₹5.00 Cr/Yr</strong>
+              </div>
+              {mpInfo?.is_real_government_data && (
                 <div
-                  key={item.project_id}
                   style={{
-                    padding: 'var(--space-3)',
-                    backgroundColor: '#FFF8E6',
-                    border: '1px solid #F2DC9B',
+                    display: 'inline-block',
+                    marginTop: '8px',
+                    padding: '2px 6px',
+                    backgroundColor: '#EDF4FC',
+                    color: 'var(--color-secondary)',
                     borderRadius: 'var(--radius-sm)',
-                    display: 'flex',
-                    justifyContent: 'space-between',
-                    alignItems: 'center',
-                    flexWrap: 'wrap',
-                    gap: 'var(--space-2)',
+                    fontSize: '10px',
+                    fontWeight: 700,
+                    letterSpacing: '0.04em',
+                    textTransform: 'uppercase',
                   }}
                 >
-                  <div>
-                    <div style={{ fontWeight: 600, color: '#8A6100', fontSize: 'var(--font-size-sm)' }}>
-                      {item.project_id}: {item.title}
-                    </div>
-                    <div style={{ fontSize: '12px', color: 'var(--color-text)', marginTop: '2px' }}>
-                      {item.reason}
-                    </div>
-                  </div>
-                  <StatusBadge status={item.status} />
+                  ✓ Real Government Record
                 </div>
-              ))}
-            </div>
-          ) : (
-            <div style={{ fontSize: 'var(--font-size-sm)', color: 'var(--color-muted)', padding: 'var(--space-2) 0' }}>
-              ✓ All recommended works are currently in normal progression. No pending clarification notices or held works.
-            </div>
+              )}
+            </Card>
           )}
-        </Card>
-      </div>
+
+          {/* Total Recommendations Card */}
+          {(activeSection === 'dashboard' || activeSection === 'works') && (
+            <Card title="Total Works" subtitle="Lifecycle progression">
+              <div style={{ fontSize: '26px', fontWeight: 700, color: 'var(--color-primary)' }}>
+                {counts.total || 0}
+              </div>
+              <div style={{ fontSize: '12px', color: 'var(--color-muted)', marginTop: '4px' }}>
+                Under Review: <strong>{counts.district_review || 0}</strong> • Sanctioned: <strong>{counts.sanctioned || 0}</strong>
+              </div>
+            </Card>
+          )}
+
+          {/* Sanctioned Outlay */}
+          {(activeSection === 'dashboard' || activeSection === 'finance') && (
+            <Card title="Sanctioned Outlay" subtitle="Approved works value">
+              <div style={{ fontSize: '26px', fontWeight: 700, color: 'var(--color-success)' }}>
+                ₹{((financial.total_sanctioned_cost || 0) / 100000).toFixed(2)} <span style={{ fontSize: '14px', fontWeight: 500 }}>Lakh</span>
+              </div>
+              <div style={{ fontSize: '12px', color: 'var(--color-muted)', marginTop: '4px' }}>
+                Estimated Value: ₹{((financial.total_estimated_cost || 0) / 100000).toFixed(2)} Lakh
+              </div>
+            </Card>
+          )}
+
+          {/* Completion Rate */}
+          {(activeSection === 'dashboard' || activeSection === 'works') && (
+            <Card title="Completion Rate" subtitle="Physical progress">
+              <div style={{ fontSize: '26px', fontWeight: 700, color: 'var(--color-secondary)' }}>
+                {dashboardData?.completion_rate || 0}%
+              </div>
+              <div style={{ height: '6px', backgroundColor: '#E2E8F0', borderRadius: '3px', marginTop: '10px', overflow: 'hidden' }}>
+                <div
+                  style={{
+                    width: `${dashboardData?.completion_rate || 0}%`,
+                    height: '100%',
+                    backgroundColor: 'var(--color-secondary)',
+                  }}
+                />
+              </div>
+            </Card>
+          )}
+        </div>
+      )}
+
+      {/* Financial & Allocation Specific Panel */}
+      {activeSection === 'finance' && (
+        <div style={{ marginBottom: 'var(--space-6)' }}>
+          <Card title="Constituency Financial Breakdown" subtitle="Allocation entitlement and expenditure tracking">
+            <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(200px, 1fr))', gap: 'var(--space-4)', marginBottom: 'var(--space-4)' }}>
+              <div style={{ padding: 'var(--space-3)', backgroundColor: '#F8FAFC', borderRadius: 'var(--radius-sm)', border: '1px solid var(--color-border)' }}>
+                <div style={{ fontSize: '11px', color: 'var(--color-muted)', fontWeight: 600 }}>ANNUAL ENTITLEMENT</div>
+                <div style={{ fontSize: '22px', fontWeight: 700, color: 'var(--color-primary)', marginTop: '4px' }}>₹5.00 Cr/Year</div>
+              </div>
+              <div style={{ padding: 'var(--space-3)', backgroundColor: '#F8FAFC', borderRadius: 'var(--radius-sm)', border: '1px solid var(--color-border)' }}>
+                <div style={{ fontSize: '11px', color: 'var(--color-muted)', fontWeight: 600 }}>CUMULATIVE ALLOCATION</div>
+                <div style={{ fontSize: '22px', fontWeight: 700, color: 'var(--color-secondary)', marginTop: '4px' }}>₹{allocatedCr} Cr</div>
+              </div>
+              <div style={{ padding: 'var(--space-3)', backgroundColor: '#F8FAFC', borderRadius: 'var(--radius-sm)', border: '1px solid var(--color-border)' }}>
+                <div style={{ fontSize: '11px', color: 'var(--color-muted)', fontWeight: 600 }}>SANCTIONED COST</div>
+                <div style={{ fontSize: '22px', fontWeight: 700, color: 'var(--color-success)', marginTop: '4px' }}>
+                  ₹{((financial.total_sanctioned_cost || 0) / 100000).toFixed(2)} L
+                </div>
+              </div>
+              <div style={{ padding: 'var(--space-3)', backgroundColor: '#F8FAFC', borderRadius: 'var(--radius-sm)', border: '1px solid var(--color-border)' }}>
+                <div style={{ fontSize: '11px', color: 'var(--color-muted)', fontWeight: 600 }}>RECOMMENDED ESTIMATE</div>
+                <div style={{ fontSize: '22px', fontWeight: 700, color: 'var(--color-primary)', marginTop: '4px' }}>
+                  ₹{((financial.total_estimated_cost || 0) / 100000).toFixed(2)} L
+                </div>
+              </div>
+            </div>
+            <div style={{ padding: 'var(--space-3)', backgroundColor: '#EDF4FC', borderRadius: 'var(--radius-sm)', fontSize: 'var(--font-size-sm)', color: '#1E3A8A' }}>
+              ✓ Verified MoSPI official allocation data for {constituency}. All proposals are tracked against the annual MPLADS entitlement.
+            </div>
+          </Card>
+        </div>
+      )}
+
+      {/* Attention Required Section (Derived from Project Status & AI Risk) */}
+      {(activeSection === 'dashboard' || activeSection === 'attention') && (
+        <div style={{ marginBottom: 'var(--space-6)' }}>
+          <Card title="Attention Required" subtitle="Items requiring MP review or clarification">
+            {attention?.attention_count > 0 ? (
+              <div style={{ display: 'flex', flexDirection: 'column', gap: 'var(--space-3)' }}>
+                {attention.items.map((item) => (
+                  <div
+                    key={item.project_id}
+                    style={{
+                      padding: 'var(--space-3)',
+                      backgroundColor: '#FFF8E6',
+                      border: '1px solid #F2DC9B',
+                      borderRadius: 'var(--radius-sm)',
+                      display: 'flex',
+                      justifyContent: 'space-between',
+                      alignItems: 'center',
+                      flexWrap: 'wrap',
+                      gap: 'var(--space-2)',
+                    }}
+                  >
+                    <div>
+                      <div style={{ fontWeight: 600, color: '#8A6100', fontSize: 'var(--font-size-sm)' }}>
+                        {item.project_id}: {item.title}
+                      </div>
+                      <div style={{ fontSize: '12px', color: 'var(--color-text)', marginTop: '2px' }}>
+                        {item.reason}
+                      </div>
+                    </div>
+                    <StatusBadge status={item.status} />
+                  </div>
+                ))}
+              </div>
+            ) : (
+              <div style={{ fontSize: 'var(--font-size-sm)', color: 'var(--color-muted)', padding: 'var(--space-2) 0' }}>
+                ✓ All recommended works are currently in normal progression. No pending clarification notices or held works.
+              </div>
+            )}
+          </Card>
+        </div>
+      )}
 
       {/* My Recommendations Table */}
-      <Card title="My Work Recommendations" subtitle="Submitted proposals and current review statuses">
+      {(activeSection === 'dashboard' || activeSection === 'recs' || activeSection === 'works') && (
+        <Card
+          title={activeSection === 'works' ? 'Works Status Tracking' : 'My Work Recommendations'}
+          subtitle={
+            activeSection === 'works'
+              ? 'Real-time execution status and progress across all recommended works'
+              : 'Submitted proposals and current review statuses'
+          }
+        >
         {loading ? (
           <div style={{ padding: 'var(--space-4)', textAlign: 'center', color: 'var(--color-muted)' }}>
             Loading recommendations...
@@ -446,7 +507,8 @@ export function MPWorkspace() {
             )}
           </div>
         )}
-      </Card>
+        </Card>
+      )}
 
       {/* Modal: Recommend New Work */}
       {showModal && (

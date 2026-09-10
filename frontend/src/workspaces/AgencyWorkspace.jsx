@@ -11,6 +11,7 @@ export function AgencyWorkspace() {
   const [data, setData] = useState(null);
   const [loading, setLoading] = useState(true);
   const [selectedProjectId, setSelectedProjectId] = useState(null);
+  const [activeSection, setActiveSection] = useState('dashboard');
 
   const navItems = [
     { label: 'Agency Dashboard', key: 'dashboard' },
@@ -44,7 +45,12 @@ export function AgencyWorkspace() {
   const assignedWorks = data?.assigned_works || [];
 
   return (
-    <WorkspaceLayout roleTitle="Implementing Agency" navItems={navItems}>
+    <WorkspaceLayout
+      roleTitle="Implementing Agency"
+      navItems={navItems}
+      activeNavKey={activeSection}
+      onNavSelect={setActiveSection}
+    >
       {/* Header */}
       <div style={{ marginBottom: 'var(--space-6)' }}>
         <div
@@ -68,53 +74,85 @@ export function AgencyWorkspace() {
       </div>
 
       {/* Metric Cards */}
-      <div
-        style={{
-          display: 'grid',
-          gridTemplateColumns: 'repeat(auto-fit, minmax(220px, 1fr))',
-          gap: 'var(--space-4)',
-          marginBottom: 'var(--space-6)',
-        }}
-      >
-        <Card title="Assigned Works" subtitle="Active district works">
-          <div style={{ fontSize: '26px', fontWeight: 700, color: 'var(--color-primary)' }}>
-            {counts.assigned || 0}
-          </div>
-          <div style={{ fontSize: '12px', color: 'var(--color-muted)', marginTop: '4px' }}>
-            Works in jurisdiction
-          </div>
-        </Card>
+      {(activeSection === 'dashboard' || activeSection === 'progress' || activeSection === 'ucs') && (
+        <div
+          style={{
+            display: 'grid',
+            gridTemplateColumns: 'repeat(auto-fit, minmax(220px, 1fr))',
+            gap: 'var(--space-4)',
+            marginBottom: 'var(--space-6)',
+          }}
+        >
+          {activeSection !== 'ucs' && (
+            <Card title="Assigned Works" subtitle="Active district works">
+              <div style={{ fontSize: '26px', fontWeight: 700, color: 'var(--color-primary)' }}>
+                {counts.assigned || 0}
+              </div>
+              <div style={{ fontSize: '12px', color: 'var(--color-muted)', marginTop: '4px' }}>
+                Works in jurisdiction
+              </div>
+            </Card>
+          )}
 
-        <Card title="In Progress" subtitle="Physical execution">
-          <div style={{ fontSize: '26px', fontWeight: 700, color: 'var(--color-secondary)' }}>
-            {counts.in_progress || 0}
-          </div>
-          <div style={{ fontSize: '12px', color: 'var(--color-muted)', marginTop: '4px' }}>
-            Under construction
-          </div>
-        </Card>
+          {activeSection !== 'ucs' && (
+            <Card title="In Progress" subtitle="Physical execution">
+              <div style={{ fontSize: '26px', fontWeight: 700, color: 'var(--color-secondary)' }}>
+                {counts.in_progress || 0}
+              </div>
+              <div style={{ fontSize: '12px', color: 'var(--color-muted)', marginTop: '4px' }}>
+                Under construction
+              </div>
+            </Card>
+          )}
 
-        <Card title="Completed Works" subtitle="Finished infrastructure">
-          <div style={{ fontSize: '26px', fontWeight: 700, color: 'var(--color-success)' }}>
-            {counts.completed || 0}
-          </div>
-          <div style={{ fontSize: '12px', color: 'var(--color-muted)', marginTop: '4px' }}>
-            Ready for closure
-          </div>
-        </Card>
+          {activeSection !== 'ucs' && (
+            <Card title="Completed Works" subtitle="Finished infrastructure">
+              <div style={{ fontSize: '26px', fontWeight: 700, color: 'var(--color-success)' }}>
+                {counts.completed || 0}
+              </div>
+              <div style={{ fontSize: '12px', color: 'var(--color-muted)', marginTop: '4px' }}>
+                Ready for closure
+              </div>
+            </Card>
+          )}
 
-        <Card title="UC Pending" subtitle="Utilization Certificate (Phase 5)">
-          <div style={{ fontSize: '26px', fontWeight: 700, color: 'var(--color-muted)' }}>
-            {counts.pending_uc || 0}
-          </div>
-          <div style={{ fontSize: '12px', color: 'var(--color-muted)', marginTop: '4px' }}>
-            UC submission pipeline (Phase 5)
-          </div>
-        </Card>
-      </div>
+          <Card title="UC Pending" subtitle="Utilization Certificate (Phase 5)">
+            <div style={{ fontSize: '26px', fontWeight: 700, color: 'var(--color-muted)' }}>
+              {counts.pending_uc || 0}
+            </div>
+            <div style={{ fontSize: '12px', color: 'var(--color-muted)', marginTop: '4px' }}>
+              UC submission pipeline (Phase 5)
+            </div>
+          </Card>
+        </div>
+      )}
+
+      {/* UC Submission Pipeline Dedicated Panel */}
+      {activeSection === 'ucs' && (
+        <div style={{ marginBottom: 'var(--space-6)' }}>
+          <Card title="Utilization Certificates (UC) Pipeline" subtitle="Statutory compliance & expenditure accounting">
+            <div style={{ padding: 'var(--space-4)', backgroundColor: '#EDF4FC', borderRadius: 'var(--radius-sm)', fontSize: 'var(--font-size-sm)', color: '#1E3A8A', lineHeight: 1.6 }}>
+              <strong>Phase 5 UC Submission Mandate:</strong> The Implementing Agency must furnish Utilization Certificates (UCs) to the District Authority verifying that released instalments were utilized strictly for approved project work items. Below is the list of works requiring or processing UCs.
+            </div>
+          </Card>
+        </div>
+      )}
 
       {/* Assigned Works Table */}
-      <Card title="Assigned Works List" subtitle="Works currently assigned to agency for execution">
+      <Card
+        title={
+          activeSection === 'progress'
+            ? 'Physical Progress Tracking'
+            : activeSection === 'ucs'
+            ? 'Works Requiring Utilization Certificates'
+            : 'Assigned Works List'
+        }
+        subtitle={
+          activeSection === 'progress'
+            ? 'Monitor ground progress milestones and completion status'
+            : 'Works currently assigned to agency for execution'
+        }
+      >
         {loading ? (
           <div style={{ padding: 'var(--space-4)', textAlign: 'center', color: 'var(--color-muted)' }}>
             Loading assigned works...

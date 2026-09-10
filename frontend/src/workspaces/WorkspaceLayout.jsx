@@ -5,7 +5,14 @@ import { usePreferences } from '../context/PreferencesContext';
 import Button from '../components/Button';
 import Footer from '../components/Footer';
 
-export function WorkspaceLayout({ children, roleTitle, jurisdictionLabel, navItems = [] }) {
+export function WorkspaceLayout({
+  children,
+  roleTitle,
+  jurisdictionLabel,
+  navItems = [],
+  activeNavKey,
+  onNavSelect,
+}) {
   const { user, logout } = useAuth();
   const { sidebarCollapsed, toggleSidebar } = usePreferences();
   const navigate = useNavigate();
@@ -160,12 +167,20 @@ export function WorkspaceLayout({ children, roleTitle, jurisdictionLabel, navIte
 
           <nav style={{ padding: 'var(--space-2)', flex: 1, display: 'flex', flexDirection: 'column', gap: '2px' }}>
             {navItems.map((item, idx) => {
-              const isActive = idx === 0; // Default active highlight
+              const isActive = activeNavKey !== undefined ? activeNavKey === item.key : idx === 0;
               return (
                 <button
                   key={item.key || idx}
                   type="button"
                   title={item.label}
+                  onClick={() => {
+                    if (onNavSelect) {
+                      onNavSelect(item.key, item);
+                    } else if (item.onClick) {
+                      item.onClick();
+                    }
+                  }}
+                  aria-current={isActive ? 'page' : undefined}
                   style={{
                     width: '100%',
                     textAlign: 'left',

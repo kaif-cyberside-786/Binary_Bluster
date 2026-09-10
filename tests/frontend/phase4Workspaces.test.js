@@ -71,5 +71,43 @@ describe('Phase 4 Frontend Workspaces & Preferences Tests', () => {
     const audContent = fs.readFileSync(path.join(frontendSrc, 'workspaces/AuditorWorkspace.jsx'), 'utf8');
     assert.ok(audContent.includes('/api/dashboard/auditor'), 'AuditorWorkspace must call /api/dashboard/auditor');
   });
+
+  test('WorkspaceLayout.jsx wires activeNavKey, onNavSelect, aria-current, and click handlers to sidebar navigation', () => {
+    const filePath = path.join(frontendSrc, 'workspaces/WorkspaceLayout.jsx');
+    const content = fs.readFileSync(filePath, 'utf8');
+    assert.ok(content.includes('activeNavKey'), 'WorkspaceLayout must accept activeNavKey prop');
+    assert.ok(content.includes('onNavSelect'), 'WorkspaceLayout must accept onNavSelect prop');
+    assert.ok(content.includes('aria-current'), 'WorkspaceLayout must set aria-current for active navigation items');
+    assert.ok(content.includes('onClick='), 'WorkspaceLayout nav buttons must have onClick handler');
+  });
+
+  test('DistrictWorkspace.jsx wires sidebar navigation keys (dashboard, queue, sanctioned, inspections, inventory)', () => {
+    const filePath = path.join(frontendSrc, 'workspaces/DistrictWorkspace.jsx');
+    const content = fs.readFileSync(filePath, 'utf8');
+    assert.ok(content.includes('activeNavKey={activeSection}'), 'DistrictWorkspace must pass activeNavKey');
+    assert.ok(content.includes('onNavSelect='), 'DistrictWorkspace must pass onNavSelect');
+    assert.ok(content.includes("key === 'queue'"), 'DistrictWorkspace must handle queue navigation');
+    assert.ok(content.includes("key === 'sanctioned'"), 'DistrictWorkspace must handle sanctioned navigation');
+    assert.ok(content.includes("key === 'inspections'"), 'DistrictWorkspace must handle inspections navigation');
+    assert.ok(content.includes("key === 'inventory'"), 'DistrictWorkspace must handle inventory navigation');
+    assert.ok(content.includes('10% Statutory Inspection Quota Details'), 'DistrictWorkspace must render inspection quota details');
+  });
+
+  test('All 7 role workspaces wire activeNavKey and onNavSelect to WorkspaceLayout', () => {
+    const workspaces = [
+      'DistrictWorkspace.jsx',
+      'MPWorkspace.jsx',
+      'StateWorkspace.jsx',
+      'MinistryWorkspace.jsx',
+      'AgencyWorkspace.jsx',
+      'AuditorWorkspace.jsx',
+      'AdminWorkspace.jsx',
+    ];
+    for (const ws of workspaces) {
+      const content = fs.readFileSync(path.join(frontendSrc, 'workspaces', ws), 'utf8');
+      assert.ok(content.includes('activeNavKey={activeSection}'), `${ws} must pass activeNavKey={activeSection}`);
+      assert.ok(content.includes('onNavSelect='), `${ws} must pass onNavSelect to WorkspaceLayout`);
+    }
+  });
 });
 
