@@ -32,6 +32,12 @@ async function startServer() {
     } catch (err) {
       logger.warn('Could not auto-ingest MP allocations on startup', { error: err.message });
     }
+    try {
+      const { seedAgencies } = require('./src/utils/seedAgencies');
+      await seedAgencies();
+    } catch (err) {
+      logger.warn('Could not seed implementing agencies on startup', { error: err.message });
+    }
   }
 
   const server = http.createServer(app);

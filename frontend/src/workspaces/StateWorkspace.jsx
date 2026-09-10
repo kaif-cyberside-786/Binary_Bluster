@@ -2,6 +2,7 @@ import React, { useState, useEffect, useCallback } from 'react';
 import { useAuth } from '../context/AuthContext';
 import WorkspaceLayout from './WorkspaceLayout';
 import Card from '../components/Card';
+import AgencyConcentrationPanel from '../components/AgencyConcentrationPanel';
 
 export function StateWorkspace() {
   const { user, authFetch } = useAuth();
@@ -13,6 +14,7 @@ export function StateWorkspace() {
 
   const navItems = [
     { label: 'State Dashboard', key: 'dashboard' },
+    { label: 'Agency Concentration', key: 'concentration' },
     { label: 'State-wide Projects', key: 'projects' },
     { label: '1% Physical Inspection', key: 'inspections' },
     { label: 'District Comparisons', key: 'districts' },
@@ -136,6 +138,18 @@ export function StateWorkspace() {
               <strong>Statutory Requirement (Guidelines §5.2):</strong> State Nodal Department officers are required to physically inspect at least 1% of works implemented in each district annually. Field inspections by state teams benchmark quality, adherence to administrative approvals, and coordinate with District Collectors to resolve bottleneck issues.
             </div>
           </Card>
+        </div>
+      )}
+
+      {/* Agency Concentration Systemic Analytics Panel (Phase 12, PRD §12.7) */}
+      {(activeSection === 'concentration' || activeSection === 'dashboard') && (
+        <div style={{ marginBottom: 'var(--space-6)' }}>
+          <AgencyConcentrationPanel
+            district="Indore"
+            state={state}
+            year="2026"
+            authFetch={authFetch}
+          />
         </div>
       )}
 

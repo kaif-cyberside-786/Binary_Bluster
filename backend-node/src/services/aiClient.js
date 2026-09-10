@@ -126,6 +126,20 @@ class AiClient {
   async generateExplanation(payload) {
     return this._post('/ai/explain', payload);
   }
+
+  /**
+   * Phase 12 Agency Suitability (advisory ranking with concentration guardrail)
+   */
+  async checkAgencySuitability(payload) {
+    return this._post('/ai/agency-suitability', payload);
+  }
+
+  /**
+   * Phase 12 Agency Concentration (systemic work-share and Herfindahl index)
+   */
+  async checkAgencyConcentration(payload) {
+    return this._post('/ai/agency-concentration', payload);
+  }
 }
 
 module.exports = new AiClient();

@@ -4,6 +4,7 @@ import Card from './Card';
 import Button from './Button';
 import { StatusBadge, RiskBadge, ComplianceBadge } from './Badge';
 import { RiskBreakdown } from './AiReviewPanel';
+import AgencySuitabilityCard from './AgencySuitabilityCard';
 
 /**
  * DistrictReviewModal Component — Phase 10
@@ -962,7 +963,9 @@ export function DistrictReviewModal({ projectId, isOpen, onClose, onDecisionReco
               backgroundColor: '#FFFFFF',
               borderRadius: 'var(--radius-md)',
               width: '100%',
-              maxWidth: '560px',
+              maxWidth: pendingDecision === 'SANCTION' ? '700px' : '560px',
+              maxHeight: '90vh',
+              overflowY: 'auto',
               padding: 'var(--space-5)',
               boxShadow: '0 25px 50px -12px rgba(0, 0, 0, 0.25)',
               border: '1px solid var(--color-border)',
@@ -1038,8 +1041,21 @@ export function DistrictReviewModal({ projectId, isOpen, onClose, onDecisionReco
 
                   {pendingDecision === 'SANCTION' && (
                     <div style={{ marginBottom: 'var(--space-4)' }}>
+                      <div style={{ marginBottom: 'var(--space-3)' }}>
+                        <AgencySuitabilityCard
+                          category={project?.category}
+                          estimatedCost={project?.sanctioned_cost || project?.estimated_cost}
+                          district={project?.district || 'Indore'}
+                          state={project?.state || 'Madhya Pradesh'}
+                          selectedAgencyId={assignedAgencyId}
+                          onSelectAgency={(id) => setAssignedAgencyId(id)}
+                          authFetch={authFetch}
+                        />
+                      </div>
+
                       <label style={{ display: 'block', fontSize: '12px', fontWeight: 600, marginBottom: '4px' }}>
                         Assign Implementing Agency *
+                        Selected Implementing Agency (Administrative Assignment) *
                       </label>
                       <select
                         value={assignedAgencyId}
@@ -1057,7 +1073,11 @@ export function DistrictReviewModal({ projectId, isOpen, onClose, onDecisionReco
                         <option value="RES-INDORE-01">Rural Engineering Services (RES-INDORE-01)</option>
                         <option value="CPWD-INDORE-01">Central Public Works Department (CPWD)</option>
                         <option value="MP-RDC-01">MP Road Development Corporation (MP-RDC)</option>
+                        <option value="IMC-INDORE-01">Indore Municipal Corporation (IMC-INDORE-01)</option>
                       </select>
+                      <div style={{ fontSize: '11px', color: 'var(--color-muted)', marginTop: '4px' }}>
+                        * Advisory suggestion pre-fills this selection. You may choose any eligible agency before signing sanction approval.
+                      </div>
                     </div>
                   )}
 

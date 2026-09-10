@@ -559,8 +559,62 @@ AI compares, detects anomalies, calculates/receives risk signals, explains findi
     - Full unified test suite (`node tests/runAll.js`): **205/205 passing across 31 test suites**.
     - Frontend production build (`npm run build:frontend`): **Passes cleanly in 1.11s with 0 errors**.
 - **Not done / remaining**:
-  - Phase 12 (Scheduled Automation & Escalation / physical inspection targeting). Do not start until requested.
+  - None for Phase 11.
 - **Notes**:
   - Express is the sole authorization and persistence boundary.
   - AI remains strictly advisory per `rules.md` §12: high mismatch never automatically holds, suspends, or cancels a project.
   - Admin isolation verified: Admins receive 403 `ADMIN_ISOLATION` and cannot access execution monitoring data.
+
+### Phase 12: Agency Intelligence & Efficiency
+- **Status**: Complete
+- **Exit Checklist**:
+  - [x] Requirements completed
+  - [x] Code reviewed
+  - [x] Feature tested
+  - [x] Security/permissions verified where applicable
+  - [x] Documentation/memory updated where applicable
+  - [x] No known blocking issues
+- **Done**:
+  - Database Seeding & Master Registry (`backend-node/src/utils/seedAgencies.js`):
+    - Seeds public executing agencies (`PWD-INDORE-01`, `RES-INDORE-01`, `CPWD-INDORE-01`, `MP-RDC-01`, `IMC-INDORE-01`).
+    - Seeds baseline performance records (`completion_rate`, `avg_delay_days`, `cost_deviation_avg_percentage`, `adverse_inspection_count`, `performance_score`).
+    - Seeds baseline concentration statistics (`share_of_value_percentage`, `herfindahl_index_contribution`, `is_concentration_flagged`).
+    - Wired into server startup in `backend-node/server.js`.
+  - Backend Domain Service (`backend-node/src/services/agencyIntelligenceService.js`):
+    - Implemented Product 1: Agency Suitability advisory ranking with multi-factor scoring (completion rate 25%, delay penalty 20%, cost deviation penalty 20%, inspection outcomes 15%, category match 20%).
+    - Implemented statutory Concentration Guardrail (`PRD §12.8`): flags agencies with >35% district work share (`concentration_warning: true`), applies score penalty (-16 points), and caps top-recommendation to prevent reinforcing single-agency monopolies.
+    - Implemented Product 2: Agency Concentration analytics (`PRD §12.7`, `design.md` §5.33) calculating work-share %, value-share %, Herfindahl-Hirschman Index (HHI), and threshold flags (>35% value share).
+    - Preserves architectural separation: Two distinct products, never merged into a single "agency score".
+    - Resilient offline fallback guarantee: Deterministic Node calculations run seamlessly when Python microservice is offline.
+  - Express API Layer (`backend-node/src/routes/agencies.js`):
+    - Mounted at `/api/agencies`.
+    - `GET /api/agencies` (jurisdiction-scoped list).
+    - `GET /api/agencies/:id` (profile details).
+    - `GET /api/agencies/:id/performance` (performance metrics, 403 `ADMIN_ISOLATION`).
+    - `POST /api/agencies/suitability` (advisory ranking, 403 `ADMIN_ISOLATION`).
+    - `GET /api/agencies/concentration` (systemic analytics & HHI, 403 `ADMIN_ISOLATION`).
+  - Python AI Microservice (`ai-service`):
+    - Added Pydantic schemas in `app/schemas.py` (`AgencySuitabilityRequest`, `AgencyConcentrationRequest`, etc.).
+    - Created `app/services/agency_service.py` with `analyze_agency_suitability` and `analyze_agency_concentration`.
+    - Mounted `POST /ai/agency-suitability` and `POST /ai/agency-concentration` in `app/main.py`.
+    - Added client dispatch methods in `backend-node/src/services/aiClient.js`.
+  - Frontend UI Components:
+    - `AgencySuitabilityCard.jsx`: Advisory ranking per project with statutory disclaimer, expandable factor breakdown, concentration guardrail alert banner, and "Select Agency" action that ONLY pre-fills the sanction form (never auto-sanctions or skips officer decisions).
+    - `AgencyConcentrationPanel.jsx`: Systemic work-share and financial-value distribution with Herfindahl Index gauge and threshold warning badges (>35% share).
+    - `DistrictReviewModal.jsx`: Embedded `AgencySuitabilityCard` directly in the Sanction confirmation workflow.
+    - `StateWorkspace.jsx`: Embedded `AgencyConcentrationPanel` with dedicated navigation item.
+    - `MinistryWorkspace.jsx`: Embedded `AgencyConcentrationPanel` with dedicated navigation item.
+    - `AgencyWorkspace.jsx`: Added Performance Track Record scorecard tab with live benchmark metrics.
+  - Automated Tests & Verification:
+    - `tests/backend/agencyIntelligencePhase12.test.js`: **11/11 passing** across 5 suites.
+    - `tests/frontend/phase12AgencyIntelligence.test.js`: **10/10 passing**.
+    - Unified test suite (`npm test` / `node tests/runAll.js`): **231/231 passing across 38 suites**.
+    - Frontend production build (`npm run build:frontend`): **Passes cleanly in 1.32s with 0 errors**.
+- **Not done / remaining**:
+  - Phase 13 (Field Verification & Inspection Intelligence / 10% DA & 1% SNA statutory quotas). Do not start until requested.
+- **Notes**:
+  - Two separate products strictly preserved: Suitability (ranked advisory score per project) vs. Concentration (systemic work-share % and HHI).
+  - Suitability is advisory only per `rules.md` §12: District Collector retains sole selection authority.
+  - Concentration guardrail enforced in service logic per `prd.md` §12.8.
+  - Admin Isolation verified: Admins receive 403 `ADMIN_ISOLATION` on all agency performance, suitability, and concentration endpoints.
+

@@ -46,4 +46,8 @@ router.use('/dashboard', dashboardRoutes);
 // Mount user preferences routes (/api/user/preferences/...)
 router.use('/user/preferences', userPreferenceRoutes);
 
+// Mount agency intelligence routes (/api/agencies/...)
+const agencyRoutes = require('./agencies');
+router.use('/agencies', agencyRoutes);
+
 module.exports = router;

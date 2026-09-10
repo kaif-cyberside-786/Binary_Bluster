@@ -83,3 +83,73 @@ class ExplanationResponse(BaseModel):
     model: Optional[str] = Field(None, description="Model identifier used")
     data_minimized: bool = Field(True, description="Strict de-identified evidence adherence guarantee")
 
+
+# Phase 12: Agency Intelligence Schemas
+class CandidateAgency(BaseModel):
+    agency_id: str
+    name: str
+    type: str
+    completion_rate: Optional[float] = 75.0
+    avg_delay_days: Optional[int] = 30
+    cost_deviation_percentage: Optional[float] = 5.0
+    adverse_inspections: Optional[int] = 0
+    district_work_share_percentage: Optional[float] = 0.0
+
+
+class RankedAgency(BaseModel):
+    agency_id: str
+    name: str
+    type: str
+    suitability_score: int
+    raw_score: int
+    rank: int
+    concentration_warning: bool
+    concentration_message: Optional[str] = None
+    metrics: Dict[str, Any] = Field(default_factory=dict)
+
+
+class AgencySuitabilityRequest(BaseModel):
+    category: Optional[str] = "GENERAL"
+    estimated_cost: Optional[float] = 0.0
+    district: Optional[str] = "Indore"
+    state: Optional[str] = "Madhya Pradesh"
+    candidate_agencies: List[CandidateAgency] = Field(default_factory=list)
+
+
+class AgencySuitabilityResponse(BaseModel):
+    product: str = "AGENCY_SUITABILITY"
+    project_category: str
+    advisory_disclaimer: str
+    concentration_guardrail_applied: bool
+    suggested_agencies: List[RankedAgency]
+
+
+class ConcentrationItem(BaseModel):
+    agency_id: str
+    name: str
+    work_count: int
+    total_value: float
+    share_of_value_percentage: float
+    is_concentration_flagged: bool
+    herfindahl_index_contribution: float
+
+
+class AgencyConcentrationRequest(BaseModel):
+    district: str = "Indore"
+    state: str = "Madhya Pradesh"
+    year: Optional[str] = "2026"
+    agency_shares: List[ConcentrationItem] = Field(default_factory=list)
+
+
+class AgencyConcentrationResponse(BaseModel):
+    product: str = "AGENCY_CONCENTRATION"
+    district: str
+    state: str
+    year: str
+    herfindahl_index: float
+    concentration_level: str
+    concentration_summary: str
+    concentration_threshold_percentage: float = 35.0
+    agencies: List[ConcentrationItem]
+
+

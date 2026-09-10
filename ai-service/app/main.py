@@ -41,12 +41,17 @@ from app.schemas import (
     PaymentProgressRequest,
     ExplanationRequest,
     ExplanationResponse,
+    AgencySuitabilityRequest,
+    AgencySuitabilityResponse,
+    AgencyConcentrationRequest,
+    AgencyConcentrationResponse,
 )
 from app.services.cost_service import analyze_cost_anomaly
 from app.services.duplicate_service import analyze_duplicates
 from app.services.spec_service import analyze_spec_comparison
 from app.services.delay_service import analyze_delay
 from app.services.payment_service import analyze_payment_progress
+from app.services.agency_service import analyze_agency_suitability, analyze_agency_concentration
 from app.gateway.ai_gateway import ai_gateway
 
 app = FastAPI(
@@ -131,4 +136,21 @@ def explain_endpoint(req: ExplanationRequest):
         return ExplanationResponse(**res)
     except Exception as e:
         raise HTTPException(status_code=500, detail=f"AI Gateway explanation error: {str(e)}")
+
+
+@app.post("/ai/agency-suitability", response_model=AgencySuitabilityResponse)
+def agency_suitability_endpoint(req: AgencySuitabilityRequest):
+    try:
+        return analyze_agency_suitability(req)
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=f"Agency suitability analysis error: {str(e)}")
+
+
+@app.post("/ai/agency-concentration", response_model=AgencyConcentrationResponse)
+def agency_concentration_endpoint(req: AgencyConcentrationRequest):
+    try:
+        return analyze_agency_concentration(req)
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=f"Agency concentration analysis error: {str(e)}")
+
 

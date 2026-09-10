@@ -2,6 +2,7 @@ import React, { useState, useEffect, useCallback } from 'react';
 import { useAuth } from '../context/AuthContext';
 import WorkspaceLayout from './WorkspaceLayout';
 import Card from '../components/Card';
+import AgencyConcentrationPanel from '../components/AgencyConcentrationPanel';
 
 export function MinistryWorkspace() {
   const { user, authFetch } = useAuth();
@@ -11,6 +12,7 @@ export function MinistryWorkspace() {
 
   const navItems = [
     { label: 'National Dashboard', key: 'dashboard' },
+    { label: 'Agency Concentration', key: 'concentration' },
     { label: 'Pan-India Overview', key: 'overview' },
     { label: 'State Distributions', key: 'states' },
     { label: 'Supervision & Policy', key: 'policy' },
@@ -139,6 +141,18 @@ export function MinistryWorkspace() {
               ✓ Central Supervision Active: DIID maintains continuous oversight of fund flow, execution milestones, and audit compliance across all States and Union Territories.
             </div>
           </Card>
+        </div>
+      )}
+
+      {/* Agency Concentration Systemic Analytics Panel (Phase 12, PRD §12.7) */}
+      {(activeSection === 'concentration' || activeSection === 'dashboard') && (
+        <div style={{ marginBottom: 'var(--space-6)' }}>
+          <AgencyConcentrationPanel
+            district="Indore"
+            state="Madhya Pradesh"
+            year="2026"
+            authFetch={authFetch}
+          />
         </div>
       )}
 

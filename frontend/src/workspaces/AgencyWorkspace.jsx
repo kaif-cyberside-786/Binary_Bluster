@@ -12,9 +12,11 @@ export function AgencyWorkspace() {
   const [loading, setLoading] = useState(true);
   const [selectedProjectId, setSelectedProjectId] = useState(null);
   const [activeSection, setActiveSection] = useState('dashboard');
+  const [performanceData, setPerformanceData] = useState(null);
 
   const navItems = [
     { label: 'Agency Dashboard', key: 'dashboard' },
+    { label: 'Performance Track Record', key: 'performance' },
     { label: 'Assigned Works', key: 'assigned' },
     { label: 'Physical Progress', key: 'progress' },
     { label: 'Utilization Certificates', key: 'ucs' },
@@ -27,6 +29,21 @@ export function AgencyWorkspace() {
         const body = await res.json();
         if (body.success) {
           setData(body.data);
+          const targetAgencyId =
+            body.data?.agency_info?.agency_id ||
+            user?.jurisdiction?.agency_id ||
+            'PWD-INDORE-01';
+          try {
+            const perfRes = await authFetch(`/api/agencies/${targetAgencyId}/performance`);
+            if (perfRes.ok) {
+              const perfBody = await perfRes.json();
+              if (perfBody.success) {
+                setPerformanceData(perfBody.data);
+              }
+            }
+          } catch (pErr) {
+            console.warn('Could not fetch agency performance metrics:', pErr);
+          }
         }
       }
     } catch (err) {
@@ -34,7 +51,7 @@ export function AgencyWorkspace() {
     } finally {
       setLoading(false);
     }
-  }, [authFetch]);
+  }, [authFetch, user]);
 
   useEffect(() => {
     fetchAgencyData();
@@ -134,6 +151,85 @@ export function AgencyWorkspace() {
             <div style={{ padding: 'var(--space-4)', backgroundColor: '#EDF4FC', borderRadius: 'var(--radius-sm)', fontSize: 'var(--font-size-sm)', color: '#1E3A8A', lineHeight: 1.6 }}>
               <strong>Phase 5 UC Submission Mandate:</strong> The Implementing Agency must furnish Utilization Certificates (UCs) to the District Authority verifying that released instalments were utilized strictly for approved project work items. Below is the list of works requiring or processing UCs.
             </div>
+          </Card>
+        </div>
+      )}
+
+      {/* Performance Track Record Dedicated Panel (Phase 12) */}
+      {activeSection === 'performance' && (
+        <div style={{ marginBottom: 'var(--space-6)' }}>
+          <Card
+            title={`Agency Performance Scorecard — ${agencyInfo.agency_name || 'Implementing Agency'}`}
+            subtitle="Historical delivery benchmarks, cost deviations, and adverse inspection records (Phase 12)"
+          >
+            {performanceData?.performance ? (
+              <div>
+                <div
+                  style={{
+                    display: 'grid',
+                    gridTemplateColumns: 'repeat(auto-fit, minmax(200px, 1fr))',
+                    gap: 'var(--space-4)',
+                    marginBottom: 'var(--space-4)',
+                  }}
+                >
+                  <div style={{ padding: '12px', backgroundColor: '#F8FAFC', borderRadius: '4px', border: '1px solid var(--color-border)' }}>
+                    <div style={{ fontSize: '11px', color: 'var(--color-muted)', textTransform: 'uppercase', fontWeight: 600 }}>
+                      Performance Score
+                    </div>
+                    <div style={{ fontSize: '24px', fontWeight: 700, color: 'var(--color-success)', marginTop: '2px' }}>
+                      {performanceData.performance.performance_score} <span style={{ fontSize: '12px', fontWeight: 500 }}>/ 100</span>
+                    </div>
+                    <div style={{ fontSize: '11px', color: 'var(--color-muted)', marginTop: '4px' }}>
+                      Composite benchmark score
+                    </div>
+                  </div>
+
+                  <div style={{ padding: '12px', backgroundColor: '#F8FAFC', borderRadius: '4px', border: '1px solid var(--color-border)' }}>
+                    <div style={{ fontSize: '11px', color: 'var(--color-muted)', textTransform: 'uppercase', fontWeight: 600 }}>
+                      Work Completion Rate
+                    </div>
+                    <div style={{ fontSize: '24px', fontWeight: 700, color: 'var(--color-primary)', marginTop: '2px' }}>
+                      {performanceData.performance.completion_rate?.toFixed(1)}%
+                    </div>
+                    <div style={{ fontSize: '11px', color: 'var(--color-muted)', marginTop: '4px' }}>
+                      {performanceData.performance.completed_works} of {performanceData.performance.total_assigned_works} completed
+                    </div>
+                  </div>
+
+                  <div style={{ padding: '12px', backgroundColor: '#F8FAFC', borderRadius: '4px', border: '1px solid var(--color-border)' }}>
+                    <div style={{ fontSize: '11px', color: 'var(--color-muted)', textTransform: 'uppercase', fontWeight: 600 }}>
+                      Average Delay
+                    </div>
+                    <div style={{ fontSize: '24px', fontWeight: 700, color: performanceData.performance.avg_delay_days > 45 ? 'var(--color-warning)' : 'var(--color-primary)', marginTop: '2px' }}>
+                      {performanceData.performance.avg_delay_days} <span style={{ fontSize: '12px', fontWeight: 500 }}>days</span>
+                    </div>
+                    <div style={{ fontSize: '11px', color: 'var(--color-muted)', marginTop: '4px' }}>
+                      Average schedule variance
+                    </div>
+                  </div>
+
+                  <div style={{ padding: '12px', backgroundColor: '#F8FAFC', borderRadius: '4px', border: '1px solid var(--color-border)' }}>
+                    <div style={{ fontSize: '11px', color: 'var(--color-muted)', textTransform: 'uppercase', fontWeight: 600 }}>
+                      Adverse Inspections
+                    </div>
+                    <div style={{ fontSize: '24px', fontWeight: 700, color: performanceData.performance.adverse_inspection_count > 0 ? 'var(--color-error)' : 'var(--color-success)', marginTop: '2px' }}>
+                      {performanceData.performance.adverse_inspection_count}
+                    </div>
+                    <div style={{ fontSize: '11px', color: 'var(--color-muted)', marginTop: '4px' }}>
+                      Critical quality flags recorded
+                    </div>
+                  </div>
+                </div>
+
+                <div style={{ padding: '10px 14px', backgroundColor: '#EDF4FC', borderRadius: '4px', fontSize: '12px', color: '#1E3A8A' }}>
+                  ℹ <strong>Performance Period:</strong> {performanceData.performance.period} • Track record is factored into pre-sanction advisory rankings for District Authorities per rules.md §12.
+                </div>
+              </div>
+            ) : (
+              <div style={{ padding: 'var(--space-4)', textAlign: 'center', color: 'var(--color-muted)', fontSize: '13px' }}>
+                Loading agency performance benchmarks...
+              </div>
+            )}
           </Card>
         </div>
       )}
