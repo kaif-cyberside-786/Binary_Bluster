@@ -83,7 +83,7 @@ npm --prefix backend-node run dev
 npm --prefix frontend run dev
 
 # Terminal 3 (Optional): AI Microservice (port 8000)
-uvicorn ai-service.app.main:app --host 0.0.0.0 --port 8000 --reload
+python -m uvicorn app.main:app --app-dir ai-service --host 0.0.0.0 --port 8000 --reload
 ```
 
 #### Production Mode
